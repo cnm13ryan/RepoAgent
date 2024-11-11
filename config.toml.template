@@ -12,4 +12,4 @@ log_level = "DEBUG"
 model = "qwen2.5:7b"
 temperature = 0.5
 request_timeout = 400.0
-base_url = "https://localhost:11434/v1"
+base_url = "http://localhost:11434/v1"
