@@ -100,35 +100,40 @@ def need_to_generate(doc_item: DocItem, ignore_list: List[str]  = []) -> bool:
         doc_item = doc_item.father
     return False
 
-@dataclass
+@dataclass(eq=False)
 class DocItem:
     item_type: DocItemType = DocItemType._class_function
     item_status: DocItemStatus = DocItemStatus.doc_has_not_been_generated
-
-    obj_name: str = "" #对象的名字
+    obj_name: str = ""  # Object's name
     code_start_line: int = -1
     code_end_line: int = -1
-    md_content: List[str] = field(default_factory=list) #存储不同版本的doc
-    content: Dict[Any,Any] = field(default_factory=dict) #原本存储的信息
-
-    children: Dict[str, DocItem] = field(default_factory=dict)  # 子对象
-    father: Any[DocItem] = None
-
+    md_content: List[str] = field(default_factory=list)
+    content: Dict[Any, Any] = field(default_factory=dict)
+    children: Dict[str, 'DocItem'] = field(default_factory=dict, compare=False)
+    father: Optional['DocItem'] = field(default=None, compare=False)
     depth: int = 0
-    tree_path: List[DocItem] = field(default_factory=list)  # 一整条链路，从root开始
-    max_reference_ansce: Any[DocItem] = None
-
-    reference_who: List[DocItem] = field(default_factory=list) #他引用了谁
-    who_reference_me: List[DocItem] = field(default_factory=list) #谁引用了他
+    tree_path: List['DocItem'] = field(default_factory=list, compare=False)
+    max_reference_ansce: Optional['DocItem'] = field(default=None, compare=False)
+    reference_who: List['DocItem'] = field(default_factory=list, compare=False)
+    who_reference_me: List['DocItem'] = field(default_factory=list, compare=False)
     special_reference_type: List[bool] = field(default_factory=list)
-
-    reference_who_name_list: List[str] = field(default_factory=list) #他引用了谁，这个可能是老版本
-    who_reference_me_name_list: List[str] = field(default_factory=list) #谁引用了他，这个可能是老版本的
-
+    reference_who_name_list: List[str] = field(default_factory=list)
+    who_reference_me_name_list: List[str] = field(default_factory=list)
     has_task: bool = False
+    multithread_task_id: int = -1  # Task ID in multithreading
 
-    multithread_task_id: int = -1  # 在多线程中的task_id
+    def __eq__(self, other):
+        if not isinstance(other, DocItem):
+            return False
+        return (
+            self.item_type == other.item_type and
+            self.obj_name == other.obj_name and
+            self.code_start_line == other.code_start_line and
+            self.code_end_line == other.code_end_line
+        )
 
+    def __hash__(self):
+        return hash((self.item_type, self.obj_name, self.code_start_line, self.code_end_line))
 
     @staticmethod
     def has_ans_relation(now_a: DocItem, now_b: DocItem):
