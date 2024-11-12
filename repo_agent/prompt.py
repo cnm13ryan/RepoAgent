@@ -48,7 +48,7 @@ Generate comprehensive documentation for `{code_name}` in **{language}**, includ
 - Do not include information not present in the provided materials.
 """
 
-USER_PROMPT = """
+USR_PROMPT = """
 Generate comprehensive, professional documentation for the target code object in **{language}**, aimed at developers and beginners to understand its functionality, usage, and underlying mechanisms.
 
 **Instructions**
