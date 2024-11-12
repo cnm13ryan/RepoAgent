@@ -68,7 +68,7 @@ class ProjectSettings(BaseSettings):
 
 
 class ChatCompletionSettings(BaseSettings):
-    model: str = "qwen2.5:7b"
+    model: str = "llama3.1:8b-text-q4_K_M"
     temperature: PositiveFloat = 0.3
     request_timeout: PositiveFloat = 400.0
     base_url: HttpUrl = "http://localhost:11434/v1"  # type: ignore
@@ -90,10 +90,13 @@ setting = Setting.model_validate(_config_data)
 if _config_data == {}:
     write_config(setting.model_dump())
 
-# NOTE Each model's token limit has been reduced by 1024 tokens to account for the output space and 1 for boundary conditions.
 max_input_tokens_map = {
-    "qwen2.5:7b": 32768, 
-    "llama3.1:8b-text-q4_K_M": 131072,
+
+# NOTE Each model's token limit has been reduced by 2048 tokens to account for the output space and 1 for boundary conditions.
+    "qwen2.5:7b": 30719, # 32768 - 2048 - 1 = 30719
+    "llama3.1:8b-text-q4_K_M": 129023, # 131072 - 2048 - 1 = 129023
+
+# NOTE Each model's token limit has been reduced by 1024 tokens to account for the output space and 1 for boundary conditions.
     "gpt-3.5-turbo": 4096,  # NOTE OPENAI said that The gpt-3.5-turbo model alias will be automatically upgraded from gpt-3.5-turbo-0613 to gpt-3.5-turbo-0125 on February 16th. But in 2/20, then still maintain 4,096 tokens for context window.
     "gpt-3.5-turbo-0613": 4096,  # NOTE Will be deprecated on June 13, 2024.
     "gpt-3.5-turbo-16k": 16384,  # NOTE Will be deprecated on June 13, 2024.
