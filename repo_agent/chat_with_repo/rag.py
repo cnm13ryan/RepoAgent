@@ -17,8 +17,8 @@ class RepoAssistant:
         self.api_base = api_base
         self.db_path = db_path
         self.md_contents = []
-        self.llm = OpenAI(api_key=api_key, api_base=api_base,model="gpt-3.5-turbo-1106")
-        self.client = OpenAI(api_key=api_key, api_base=api_base,model="gpt-4-1106-preview")
+        self.llm = OpenAI(api_key=api_key, api_base=api_base,model="qwen2.5:7b")
+        self.client = OpenAI(api_key=api_key, api_base=api_base,model="llama3.1:8b-text-q4_K_M")
         self.lm = AI(api_key = api_key, base_url = api_base)
         self.textanslys = TextAnalysisTool(self.llm,db_path)
         self.json_data = JsonFileProcessor(db_path)
@@ -43,7 +43,7 @@ class RepoAssistant:
     
     def rerank(self, query ,docs): # 这里要防止返回值格式上出问题
         response = self.lm.chat.completions.create(
-            model='gpt-4-1106-preview',
+            model='llama3.1:8b-text-q4_K_M',
             response_format={"type": "json_object"},
             temperature=0,
             messages=[
