@@ -30,10 +30,10 @@ class ProjectSettings(BaseSettings):
     hierarchy_name: str = ".project_doc_record"
     markdown_docs_name: str = "markdown_docs"
     ignore_list: list[str] = []
-    language: str = "Chinese"
-    max_thread_count: PositiveInt = 4
-    max_document_tokens: PositiveInt = 1024
-    log_level: LogLevel = LogLevel.INFO
+    language: str = "English"
+    max_thread_count: PositiveInt = 13 
+    max_document_tokens: PositiveInt = 2048 
+    log_level: LogLevel = LogLevel.DEBUG
 
     @field_serializer("ignore_list")
     def serialize_ignore_list(self, ignore_list: list[str], info: FieldSerializationInfo):
