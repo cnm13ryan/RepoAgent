@@ -54,7 +54,7 @@ The output function name or class name should be only one.
         return response
 
 if __name__ == "__main__":
-    api_base = "https://api.openai.com/v1"
+    api_base = "http://localhost:11434/v1"
     api_key = "your_api_key"
     log_file = "your_logfile_path"
     llm = OpenAI(api_key=api_key, api_base=api_base)
