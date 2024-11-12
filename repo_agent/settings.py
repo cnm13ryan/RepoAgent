@@ -92,7 +92,7 @@ if _config_data == {}:
 
 # NOTE Each model's token limit has been reduced by 1024 tokens to account for the output space and 1 for boundary conditions.
 max_input_tokens_map = {
-    "qwen2.5:7b": 128000, 
+    "qwen2.5:7b": 32768, 
     "gpt-3.5-turbo": 4096,  # NOTE OPENAI said that The gpt-3.5-turbo model alias will be automatically upgraded from gpt-3.5-turbo-0613 to gpt-3.5-turbo-0125 on February 16th. But in 2/20, then still maintain 4,096 tokens for context window.
     "gpt-3.5-turbo-0613": 4096,  # NOTE Will be deprecated on June 13, 2024.
     "gpt-3.5-turbo-16k": 16384,  # NOTE Will be deprecated on June 13, 2024.
