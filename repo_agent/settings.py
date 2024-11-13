@@ -31,7 +31,7 @@ class ProjectSettings(BaseSettings):
     markdown_docs_name: str = "markdown_docs"
     ignore_list: list[str] = []
     language: str = "English"
-    max_thread_count: PositiveInt = 8 
+    max_thread_count: PositiveInt = 2 
     max_document_tokens: PositiveInt = 1024 
     log_level: LogLevel = LogLevel.DEBUG
 
@@ -70,7 +70,7 @@ class ProjectSettings(BaseSettings):
 class ChatCompletionSettings(BaseSettings):
     model: str = "qwen2.5-coder:32b"
     temperature: PositiveFloat = 0.3
-    request_timeout: PositiveFloat = 400.0
+    request_timeout: PositiveFloat = 5000.0
     base_url: HttpUrl = "http://localhost:11434/v1"  # type: ignore
     openai_api_key: SecretStr = Field(..., exclude=True)
 
