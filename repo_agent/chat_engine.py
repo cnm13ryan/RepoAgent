@@ -1,4 +1,4 @@
-from llama_index.llms.openai import OpenAI
+from llama_index.llms.ollama import Ollama
 
 from repo_agent.doc_meta_info import DocItem
 from repo_agent.log import logger
@@ -14,10 +14,10 @@ class ChatEngine:
     def __init__(self, project_manager):
         setting = SettingsManager.get_setting()
 
-        self.llm = OpenAI(
+        self.llm = Ollama(
             api_key=setting.chat_completion.openai_api_key.get_secret_value(),
             api_base=setting.chat_completion.openai_base_url,
-            timeout=setting.chat_completion.request_timeout,
+            request_timeout=setting.chat_completion.request_timeout,
             model=setting.chat_completion.model,
             temperature=setting.chat_completion.temperature,
             max_retries=1,
@@ -112,20 +112,23 @@ class ChatEngine:
             parameters_or_attribute=parameters_or_attribute,
             language=setting.project.language,
         )
-
     def generate_doc(self, doc_item: DocItem):
         """Generates documentation for a given DocItem."""
         messages = self.build_prompt(doc_item)
 
         try:
+            logger.debug(f"Sending messages to LLM: {messages}")
             response = self.llm.chat(messages)
-            logger.debug(f"LLM Prompt Tokens: {response.raw.usage.prompt_tokens}")  # type: ignore
-            logger.debug(
-                f"LLM Completion Tokens: {response.raw.usage.completion_tokens}"  # type: ignore
-            )
-            logger.debug(
-                f"Total LLM Token Count: {response.raw.usage.total_tokens}"  # type: ignore
-            )
+            
+            # Safely access 'usage' if it exists
+            if hasattr(response.raw, 'usage') and isinstance(response.raw.usage, dict):
+                logger.debug(f"LLM Prompt Tokens: {response.raw.usage.get('prompt_tokens')}")
+                logger.debug(f"LLM Completion Tokens: {response.raw.usage.get('completion_tokens')}")
+                logger.debug(f"Total LLM Token Count: {response.raw.usage.get('total_tokens')}")
+            else:
+                logger.debug("No usage information available in response.")
+            
+            logger.debug(f"LLM Response: {response.message.content}")
             return response.message.content
         except Exception as e:
             logger.error(f"Error in llamaindex chat call: {e}")
