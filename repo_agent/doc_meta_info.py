@@ -107,7 +107,7 @@ def need_to_generate(doc_item: DocItem, ignore_list: List[str] = []) -> bool:
     return False
 
 
-@dataclass
+@dataclass(eq=False)
 class DocItem:
     item_type: DocItemType = DocItemType._class_function
     item_status: DocItemStatus = DocItemStatus.doc_has_not_been_generated
@@ -118,15 +118,15 @@ class DocItem:
     md_content: List[str] = field(default_factory=list)  # 存储不同版本的doc
     content: Dict[Any, Any] = field(default_factory=dict)  # 原本存储的信息
 
-    children: Dict[str, DocItem] = field(default_factory=dict)  # 子对象
-    father: Any[DocItem] = None
+    children: Dict[str,'DocItem'] = field(default_factory=dict, compare=False)  # 子对象
+    father: Optional['DocItem'] = field(default=None, compare=False) 
 
     depth: int = 0
-    tree_path: List[DocItem] = field(default_factory=list)  # 一整条链路，从root开始
-    max_reference_ansce: Any[DocItem] = None
+    tree_path: List['DocItem'] = field(default_factory=list, compare=False)  # 一整条链路，从root开始
+    max_reference_ansce: Optional['DocItem'] = field(default=None, compare=False)
 
-    reference_who: List[DocItem] = field(default_factory=list)  # 他引用了谁
-    who_reference_me: List[DocItem] = field(default_factory=list)  # 谁引用了他
+    reference_who: List['DocItem'] = field(default_factory=list, compare=False)  # 他引用了谁
+    who_reference_me: List['DocItem'] = field(default_factory=list, compare=False)  # 谁引用了他
     special_reference_type: List[bool] = field(default_factory=list)
 
     reference_who_name_list: List[str] = field(
