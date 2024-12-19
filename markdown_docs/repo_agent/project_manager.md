@@ -1,156 +1,189 @@
 ## ClassDef ProjectManager
-**ProjectManager**: The function of ProjectManager is to manage and retrieve the structure of a project repository.
+**ProjectManager**: The ProjectManager class is designed to manage and provide information about a software project's structure located at a specified repository path. It can generate a textual representation of the project's directory tree, focusing on Python files, and build a hierarchical path tree based on given reference paths.
 
-**attributes**: The attributes of this Class.
-· repo_path: The file path to the project repository.
-· project: An instance of the Jedi Project class, initialized with the repo_path.
-· project_hierarchy: The file path to the project hierarchy JSON file, constructed from the repo_path and project_hierarchy parameter.
+attributes:
+· repo_path: A string representing the absolute path to the root directory of the project.
+· project_hierarchy: A string indicating the relative path from the repository root where the project hierarchy JSON file is stored or should be created.
 
-**Code Description**: The ProjectManager class is designed to facilitate the management of a project repository by providing methods to retrieve the project's directory structure and build a reference path tree. Upon initialization, the class requires two parameters: `repo_path`, which specifies the location of the project repository, and `project_hierarchy`, which indicates the name of the hierarchy to be used. The class constructs the path to the project hierarchy JSON file by combining the repo_path with the project_hierarchy name.
+Code Description: The ProjectManager class initializes with a repository path and a project hierarchy path. It uses these paths to set up a Jedi project object for code analysis and constructs an absolute path to the project hierarchy JSON file. The get_project_structure method recursively traverses the directory tree starting from repo_path, ignoring hidden files and directories, and collects all Python files into a structured string representation of the project. This method is useful for getting an overview of the project's structure in a readable format.
 
-The `get_project_structure` method is responsible for returning the structure of the project by recursively traversing the directory tree starting from the repo_path. It constructs a string representation of the project structure, including all directories and Python files, while ignoring hidden files and directories. This method utilizes a nested function `walk_dir` to perform the recursive traversal.
+The build_path_tree method constructs a hierarchical path tree using two lists of paths (who_reference_me and reference_who) and a doc_item_path. It marks the last part of the doc_item_path with a special character ("✳️") to highlight it within the tree. The resulting tree is then converted into a string format, which can be used for visualizing relationships between different parts of the project or for documentation purposes.
 
-The `build_path_tree` method creates a hierarchical tree structure based on two lists of paths: `who_reference_me` and `reference_who`, as well as a specific `doc_item_path`. It constructs a nested dictionary using `defaultdict` to represent the tree structure. The method modifies the last part of the `doc_item_path` to indicate a specific item with a star symbol. Finally, it converts the tree structure into a string format for easier visualization.
+Note: Usage points include generating project structure overviews and building path trees for reference paths in software projects. This class is particularly useful when dealing with large codebases where understanding the directory structure and file references is crucial.
 
-The ProjectManager class is instantiated within the Runner class, where it is initialized with the target repository and hierarchy name obtained from the SettingsManager. This integration allows the Runner to leverage the ProjectManager's capabilities to manage and retrieve project structure information, which is essential for the overall functionality of the application.
-
-**Note**: When using the ProjectManager class, ensure that the provided repo_path is valid and accessible. The project_hierarchy should correspond to an existing hierarchy name to avoid file path errors.
-
-**Output Example**: A possible output of the `get_project_structure` method might look like this:
+Output Example: Mock up a possible appearance of the code's return value.
+For get_project_structure:
 ```
 project_root
   src
     main.py
-    utils.py
+    utils
+      helper.py
   tests
     test_main.py
+    test_utils.py
+```
+
+For build_path_tree:
+```
+src
+  main.py
+  utils
+    ✳️helper.py
+tests
+  test_main.py
+  test_utils.py
 ```
 ### FunctionDef __init__(self, repo_path, project_hierarchy)
-**__init__**: __init__的功能是初始化ProjectManager类的实例。
+**__init__**: Initializes a new instance of the ProjectManager class, setting up essential attributes to manage a project's repository and its hierarchical structure.
 
-**parameters**: 该函数的参数如下：
-· parameter1: repo_path - 指定项目的存储库路径。
-· parameter2: project_hierarchy - 指定项目层次结构的路径。
+parameters:
+· repo_path: A string representing the file path to the root directory of the repository that needs to be managed.
+· project_hierarchy: A string indicating the subdirectory within the repository where the project hierarchy information is stored. This path should not include the filename but rather just the directories leading up to it.
 
-**Code Description**: 该__init__函数用于初始化ProjectManager类的实例。在函数内部，首先将传入的repo_path参数赋值给实例变量self.repo_path，以便在类的其他方法中使用。接着，使用jedi库创建一个新的Project对象，并将其赋值给self.project，传入的repo_path作为参数。这使得ProjectManager能够利用jedi库提供的功能来处理代码分析和自动补全等任务。最后，函数通过os.path.join方法构建项目层次结构的完整路径，将其赋值给self.project_hierarchy。该路径由repo_path、project_hierarchy参数和一个名为"project_hierarchy.json"的文件名组成，这样可以方便地访问项目的层次结构数据。
+Code Description: Detailed analysis and description.
+The __init__ method serves as the constructor for the ProjectManager class, responsible for initializing key attributes that are crucial for managing a software project's structure within a given repository. Upon instantiation, two primary pieces of information are required: the path to the repository and the location where the project hierarchy is stored.
 
-**Note**: 使用该代码时，请确保传入的repo_path是有效的文件路径，并且project_hierarchy参数指向的目录中存在"project_hierarchy.json"文件，以避免在实例化过程中出现错误。
+Firstly, the method assigns the provided repo_path to an instance variable self.repo_path. This attribute will be used throughout the class to reference the root directory of the repository being managed.
+
+Secondly, it creates a Jedi Project object by passing the repo_path to jedi.Project(). The Jedi library is typically used for Python code analysis and provides functionalities such as autocompletion, goto definitions, and more. By creating a Project instance with the specified repository path, the ProjectManager can leverage these capabilities to analyze and manipulate the project's source files.
+
+Lastly, the method constructs the full file path to the 'project_hierarchy.json' file by joining the repo_path, the provided project_hierarchy subdirectory, and the filename "project_hierarchy.json". This constructed path is stored in the self.project_hierarchy attribute. The purpose of this JSON file is presumably to hold information about the hierarchical structure of the project, which could include details like module dependencies, package organization, or other relevant metadata.
+
+Note: Usage points.
+When creating an instance of ProjectManager, developers must provide a valid repository path and specify where within that repository the project hierarchy data can be found. This setup allows the ProjectManager to effectively manage and analyze the project's structure using both the Jedi library for code analysis and the hierarchical information stored in 'project_hierarchy.json'. Proper initialization is crucial as it sets up all necessary paths and objects required for subsequent operations within the class.
 ***
 ### FunctionDef get_project_structure(self)
-**get_project_structure**: The function of get_project_structure is to return the structure of the project by recursively walking through the directory tree.
+**get_project_structure**: This function returns a string representation of the project structure by recursively traversing the directory tree starting from the repository path stored in the `repo_path` attribute of the class instance.
 
-**parameters**: The parameters of this Function.
-· There are no parameters for this function.
+parameters:
+· No explicit parameters: The function does not take any external arguments. It operates on the `repo_path` attribute of the class instance it is called on.
 
-**Code Description**: The get_project_structure function is designed to generate a string representation of the project's directory structure. It does this by defining an inner function called walk_dir, which takes two arguments: root (the current directory being processed) and prefix (a string used to format the output). The function initializes an empty list called structure to hold the formatted directory and file names.
+Code Description: Detailed analysis and description.
+The function defines an inner helper function named `walk_dir`, which takes two parameters: `root` (the current directory path) and `prefix` (a string used to format the output for nested directories). The `structure` list accumulates strings representing each file or directory in the project structure. 
 
-The walk_dir function begins by appending the base name of the current directory (root) to the structure list, prefixed by the provided prefix. It then creates a new prefix by adding two spaces to the existing prefix to indicate a deeper level in the directory hierarchy. The function proceeds to iterate over the sorted list of items in the current directory, skipping any hidden files or directories (those starting with a dot).
+The `walk_dir` function appends the current directory's name to the `structure` list, prefixed by the current indentation level specified by `prefix`. It then iterates over all entries in this directory (sorted alphabetically), ignoring any hidden files or directories (those starting with a dot). For each entry, it checks if it is a directory or a Python file (ending with `.py`). If it's a directory, `walk_dir` calls itself recursively to process the subdirectory, increasing the indentation level. If it's a Python file, its name is added to the `structure` list at the current indentation level.
 
-For each item, it constructs the full path and checks if it is a directory or a Python file (ending with ".py"). If it is a directory, the function calls itself recursively with the new prefix. If it is a Python file, it appends the file name to the structure list with the new prefix.
+After defining `walk_dir`, the function initializes an empty list named `structure`. It then calls `walk_dir` with the initial directory path (`self.repo_path`) and no prefix (an empty string). Finally, it joins all elements in the `structure` list into a single string, separating each element by a newline character, and returns this string.
 
-Finally, after the walk_dir function has processed all directories and files, the get_project_structure function joins the elements of the structure list into a single string, separated by newline characters, and returns this string.
+Note: Usage points.
+This function is useful for generating a visual representation of a project's file structure, focusing only on Python files and excluding hidden directories or files. It can be particularly helpful for developers who need to quickly understand the layout of a new codebase or for documentation purposes.
 
-**Note**: It is important to ensure that the repo_path attribute of the class instance is correctly set to the root directory of the project before calling this function. The function will only include Python files in the output, ignoring other file types.
-
-**Output Example**: 
+Output Example: Mock up a possible appearance of the code's return value.
 ```
-project_name
+project_root
   module1
-    file1.py
-    file2.py
+    __init__.py
+    utils.py
   module2
-    file3.py
-  README.md
+    main.py
+  tests
+    test_module1.py
+    test_module2.py
 ```
 #### FunctionDef walk_dir(root, prefix)
-**walk_dir**: walk_dir的功能是遍历指定目录及其子目录，并收集所有Python文件的结构信息。
+**walk_dir**: This function recursively traverses a directory tree starting from a specified root directory and constructs a string representation of the project structure, including only Python files (.py) and excluding hidden files and directories.
 
-**parameters**: 此函数的参数如下：
-· parameter1: root - 要遍历的根目录的路径。
-· parameter2: prefix - 用于格式化输出的前缀字符串，默认为空字符串。
+**parameters**:
+· root: The path to the directory from which the traversal starts. It is expected to be a valid directory path.
+· prefix: A string used for indentation in the output structure to visually represent the hierarchy of directories and files. By default, it is an empty string.
 
-**Code Description**: 
-walk_dir函数用于递归遍历给定的目录（root）及其所有子目录。它首先将当前目录的名称（通过os.path.basename(root)获取）添加到结构列表中（structure），并在前缀字符串（prefix）后添加空格以便于格式化。接着，函数使用os.listdir(root)列出当前目录中的所有文件和子目录，并对这些名称进行排序。
+**Code Description**: Detailed analysis and description.
+The function begins by appending the current directory's name (obtained using `os.path.basename(root)`) to a list named `structure`, prefixed with the provided indentation level (`prefix`). This step ensures that each directory in the traversal is represented as a line in the final structure string, indented appropriately according to its depth in the directory tree.
 
-在遍历每个名称时，函数会检查名称是否以点（.）开头，以此来忽略隐藏文件和目录。如果名称不是隐藏的，函数会构造该名称的完整路径（path）。如果该路径是一个目录，函数会递归调用walk_dir，传入新的前缀（new_prefix）。如果该路径是一个文件且文件名以“.py”结尾，函数则将该文件的名称添加到结构列表中，前面加上新的前缀。
+A new prefix is then created by appending two spaces to the current prefix. This new prefix will be used for all items (files and directories) within the current directory, effectively increasing the indentation level by one step for each deeper level of the directory hierarchy.
 
-该函数的设计使得它能够有效地收集指定目录下所有Python文件的结构信息，并以层级方式展示。
+The function then iterates over the sorted list of names in the root directory using `os.listdir(root)`. Sorting ensures that the output structure is ordered alphabetically. For each name, it checks if the name starts with a dot (.), which indicates a hidden file or directory on Unix-like systems. If so, the item is skipped.
 
-**Note**: 使用此代码时，请确保传入的根目录路径是有效的，并且具有读取权限。此外，函数会忽略所有以点开头的文件和目录，因此如果需要处理这些文件，需调整相关逻辑。
+For non-hidden items, the function constructs the full path by joining the root directory and the current name using `os.path.join(root, name)`. It then checks whether this path corresponds to a directory using `os.path.isdir(path)`. If it does, the function calls itself recursively with the new path and the updated prefix. This recursive call processes all items within the subdirectory, maintaining the correct indentation level.
+
+If the path is not a directory but a file, the function further checks if the file name ends with ".py" to ensure that only Python files are included in the structure. If this condition is met, the file name (prefixed with the current prefix) is appended to the `structure` list.
+
+**Note**: Usage points.
+This function is designed to be used as part of a larger system for generating project structures, particularly useful for projects written in Python where only Python files are relevant. The function modifies a global list named `structure`, which should be initialized before calling this function and can be accessed after the traversal to obtain the final structure string.
+
+Developers should ensure that the root directory path provided is valid and accessible. Additionally, since the function uses recursion, care must be taken with very deep directory structures to avoid hitting Python's maximum recursion depth limit. For extremely large projects or those with deeply nested directories, an iterative approach might be more suitable.
 ***
 ***
 ### FunctionDef build_path_tree(self, who_reference_me, reference_who, doc_item_path)
-**build_path_tree**: The function of build_path_tree is to construct a hierarchical representation of file paths based on two reference lists and a specific document item path.
+**build_path_tree**: This function constructs a hierarchical tree structure from given path lists representing relationships between items (who references whom) and a specific document item path, marking the last part of the document item path with a special symbol.
 
-**parameters**: The parameters of this Function.
-· who_reference_me: A list of file paths that reference the current object.
-· reference_who: A list of file paths that are referenced by the current object.
-· doc_item_path: A specific file path that needs to be highlighted in the tree structure.
+**parameters**:
+· who_reference_me: A list of paths where each path indicates an item that references another item.
+· reference_who: A list of paths where each path indicates an item being referenced by another item.
+· doc_item_path: A specific path to a document item, which will be highlighted in the final tree structure.
 
-**Code Description**: The build_path_tree function creates a nested dictionary structure representing a tree of file paths. It utilizes the `defaultdict` from the `collections` module to facilitate the creation of this tree. The function begins by defining an inner function, `tree`, which initializes a new `defaultdict` that can recursively create nested dictionaries.
+**Code Description**: The function starts by defining a nested dictionary structure using `defaultdict` from the collections module. This structure is used to build a tree where each node can have multiple children nodes, representing parts of file paths. Two lists of paths (`who_reference_me` and `reference_who`) are processed to populate this tree. Each path in these lists is split into its components (directory names and file names), and these components are added as nested keys in the dictionary structure.
 
-The function then processes the two input lists, `who_reference_me` and `reference_who`. For each path in these lists, it splits the path into its components using the operating system's path separator (`os.sep`). It traverses the tree structure, creating a new node for each part of the path.
+After processing both lists, the function handles the `doc_item_path`. It splits this path similarly but modifies the last component by prepending a star symbol ("✳️") to it. This modified path is then also inserted into the tree structure, ensuring that the document item stands out when the tree is printed or displayed.
 
-Next, the function processes the `doc_item_path`. It splits this path into components as well, but modifies the last component by prefixing it with a star symbol (✳️) to indicate that it is the item of interest. This modified path is then added to the tree in the same manner as the previous paths.
+The function includes an inner function, `tree_to_string`, which recursively converts the nested dictionary back into a string representation of the tree. This string representation uses indentation to visually represent the hierarchy of paths in the tree. The final output of the `build_path_tree` function is this string representation of the path tree.
 
-Finally, the function defines another inner function, `tree_to_string`, which converts the nested dictionary structure into a formatted string representation. This function recursively traverses the tree, indenting each level of the hierarchy for clarity. The resulting string is returned as the output of the build_path_tree function.
+**Note**: Usage points include scenarios where one needs to visualize or analyze relationships between items based on their file system paths, such as dependency analysis in software projects or organizing documentation files.
 
-**Note**: It is important to ensure that the paths provided in `who_reference_me` and `reference_who` are valid and correctly formatted. The function assumes that the paths are well-structured and uses the operating system's path separator for splitting.
-
-**Output Example**: 
-Given the following inputs:
-- who_reference_me: ["folder1/fileA.txt", "folder1/folder2/fileB.txt"]
-- reference_who: ["folder3/fileC.txt"]
-- doc_item_path: "folder1/folder2/fileB.txt"
-
-The output of the function might look like this:
+**Output Example**: Mock up a possible appearance of the code's return value.
 ```
-folder1
-    fileA.txt
-    folder2
+dir1
+    subdir1
+        fileA.txt
+    subdir2
         ✳️fileB.txt
-folder3
+dir2
     fileC.txt
 ```
 #### FunctionDef tree
-**tree**: tree函数的功能是返回一个默认字典，该字典的默认值是一个新的tree函数。
+**tree**: This function returns a nested defaultdict where each node can recursively contain another defaultdict of the same type. It is particularly useful for creating dynamic, tree-like data structures without explicitly defining each level.
 
-**parameters**: 该函数没有参数。
+parameters:
+· No parameters: The function does not accept any arguments.
 
-**Code Description**: tree函数使用了Python的defaultdict类。defaultdict是collections模块中的一个字典子类，它提供了一个默认值，当访问的键不存在时，会自动调用一个指定的工厂函数来生成这个默认值。在这个函数中，tree函数本身被用作工厂函数，这意味着每当访问一个不存在的键时，defaultdict将会创建一个新的tree对象。这种递归的结构使得返回的字典可以用于构建树形结构，其中每个节点都可以有多个子节点，且子节点的数量和内容是动态生成的。
+Code Description: Detailed analysis and description.
+The `tree` function leverages Python's `defaultdict` from the collections module to create a self-referential structure. When you call `tree()`, it returns a defaultdict that, whenever a new key is accessed or modified, automatically creates another defaultdict of the same type as its value. This recursive behavior allows for the creation of complex nested dictionaries on-the-fly without having to manually check and initialize each level.
 
-**Note**: 使用该函数时，请注意避免无限递归的情况。由于tree函数返回的是一个defaultdict，其默认值也是tree函数本身，因此在访问未定义的键时会不断创建新的defaultdict，可能导致内存消耗过大。
+This pattern is often used in scenarios where the depth of nesting is not known beforehand, such as parsing JSON data with unknown structures, building hierarchical data models, or implementing tree-like data storage systems.
 
-**Output Example**: 调用tree函数后，可能的返回值如下：
+Note: Usage points.
+The function is particularly useful for dynamically creating nested dictionaries. It simplifies the process of adding new levels to a dictionary without raising KeyError exceptions that would occur if trying to access non-existent keys in a regular dictionary.
+
+Output Example: Mock up a possible appearance of the code's return value.
+Consider the following example:
+```python
+from collections import defaultdict
+
+def tree():
+    return defaultdict(tree)
+
+# Create a tree-like structure
+nested_dict = tree()
+nested_dict['level1']['level2']['level3'] = 'value'
+
+print(nested_dict)
 ```
-defaultdict(<function tree at 0x...>, {})
+
+The output would be:
 ```
-此返回值表示一个空的defaultdict，且其默认值是tree函数本身。若访问一个不存在的键，例如`my_tree['a']`，则会创建一个新的defaultdict，作为'a'的值。
+defaultdict(<function tree at 0x...>, {'level1': defaultdict(<function tree at 0x...>, {'level2': defaultdict(<function tree at 0x...>, {'level3': 'value'})})})
+```
+
+This example demonstrates how the `tree` function can be used to easily add nested levels to a dictionary without manually initializing each level.
 ***
 #### FunctionDef tree_to_string(tree, indent)
-**tree_to_string**: tree_to_string的功能是将树形结构转换为字符串格式，便于可视化展示。
+**tree_to_string**: Converts a nested dictionary representing a directory structure into a formatted string with indentation to visually represent the hierarchy.
 
-**parameters**: 此函数的参数如下：
-· parameter1: tree - 一个字典类型的树形结构，其中键表示节点，值可以是子节点的字典或其他类型。
-· parameter2: indent - 一个整数，表示当前节点的缩进级别，默认为0。
+**parameters**:
+· tree: A dictionary where each key is a directory name, and its value can either be None (indicating it's a file) or another dictionary (representing subdirectories).
+· indent: An integer that specifies the level of indentation for the current depth in the directory structure. It defaults to 0.
 
-**Code Description**: tree_to_string函数通过递归的方式将树形结构转换为字符串。首先，函数初始化一个空字符串s。然后，它对传入的tree字典进行排序，并遍历每一个键值对。在遍历过程中，函数将当前键（节点）添加到字符串s中，并根据indent参数添加相应数量的空格以实现缩进。如果当前值是一个字典，表示该节点有子节点，函数会递归调用tree_to_string，将子节点转换为字符串并添加到s中。最终，函数返回构建好的字符串s。
+**Code Description**: The function `tree_to_string` takes a nested dictionary and converts it into a string format that visually represents a tree-like structure, similar to how directories are displayed in an operating system's file explorer. The function iterates over each key-value pair in the dictionary, sorts them by key for consistent ordering, and appends the key (directory or file name) to a string `s`. If the value associated with a key is another dictionary, indicating that there are subdirectories or files within this directory, the function calls itself recursively, increasing the indentation level by 1. This recursion continues until all nested dictionaries have been processed, resulting in a fully formatted string representation of the directory structure.
 
-**Note**: 使用此函数时，请确保传入的tree参数是一个有效的字典结构，并且可以包含嵌套的字典。indent参数用于控制输出的格式，通常不需要手动设置，除非在特定情况下需要调整缩进。
+**Note**: The function assumes that the input dictionary is well-formed, with keys representing names and values being either None (for files) or other dictionaries (for subdirectories). The sorting of keys ensures that the output is consistent across different runs. The default indentation level of 0 means no initial spaces are added at the start of the string.
 
-**Output Example**: 假设输入的tree为如下结构：
-{
-    "根节点": {
-        "子节点1": {},
-        "子节点2": {
-            "孙节点1": {}
-        }
-    }
-}
-调用tree_to_string(tree)将返回：
-根节点
-    子节点1
-    子节点2
-        孙节点1
+**Output Example**: Given a dictionary `{'root': {'dir1': {}, 'dir2': {'file1.txt': None, 'subdir': {}}}}`, the function would return:
+```
+    dir1
+    dir2
+        file1.txt
+        subdir
+```
 ***
 ***
