@@ -1,80 +1,98 @@
 ## FunctionDef build_path_tree(who_reference_me, reference_who, doc_item_path)
-**build_path_tree**: The function of build_path_tree is to create a hierarchical representation of file paths based on provided references and a specific document item path.
+**build_path_tree**: This function constructs a hierarchical tree structure from given lists of file paths and a specific document item path. It organizes these paths into a nested dictionary format, which represents a directory-like structure, and then converts this structure into a string for easy visualization.
 
-**parameters**: The parameters of this Function.
-· parameter1: who_reference_me - A list of file paths that reference the current entity.
-· parameter2: reference_who - A list of file paths that reference another entity.
-· parameter3: doc_item_path - A specific file path that needs to be highlighted in the output.
+**parameters**:
+· who_reference_me: A list of strings, where each string is a file path indicating files that reference another file or module.
+· reference_who: A list of strings, similar to `who_reference_me`, but it contains paths of files referenced by other files or modules.
+· doc_item_path: A string representing the path to a specific document item. This path will be highlighted in the final tree structure output.
 
-**Code Description**: The build_path_tree function constructs a nested dictionary structure representing a tree of file paths. It begins by defining an inner function, tree, which initializes a defaultdict that allows for the creation of nested dictionaries automatically. The variable path_tree is then assigned the result of calling this inner function.
+**Code Description**: The function starts by defining an inner function `tree` that returns a `defaultdict` object capable of creating nested dictionaries automatically. This is used to build the path tree. Two lists, `who_reference_me` and `reference_who`, are iterated over to populate this tree. Each path in these lists is split into parts using the operating system's file separator (`os.sep`). These parts form the branches and leaves of the tree structure.
 
-The function processes two lists of paths: who_reference_me and reference_who. For each path in these lists, it splits the path into its components using the operating system's path separator (os.sep). It then traverses the path_tree structure, creating nested dictionaries for each part of the path.
+After processing both lists, the function handles the `doc_item_path`. It splits this path similarly but modifies the last part by prepending a star symbol ('✳️') to it. This modification is intended to visually highlight this specific document item in the final output.
 
-After processing the reference paths, the function handles the doc_item_path. It splits this path into components as well, but modifies the last component by prefixing it with a star symbol (✳️) to indicate it as a special item. The function again traverses the path_tree to include this modified path.
+The function then defines another inner function `tree_to_string` that recursively converts the nested dictionary structure into a formatted string. Each key-value pair in the tree is represented as a line of text, with indentation indicating the depth of the node in the hierarchy.
 
-Finally, the function defines another inner function, tree_to_string, which recursively converts the tree structure into a string representation. This function sorts the keys at each level and adds indentation based on the depth of the tree. The resulting string representation of the path_tree is returned as the output of the build_path_tree function.
+Finally, the function returns the string representation of the path tree, which includes all paths from both lists and highlights the specified `doc_item_path`.
 
-**Note**: It is important to ensure that the input paths are formatted correctly and that the os module is imported for the path separator to function properly. The output string will visually represent the hierarchy of paths, with the doc_item_path clearly marked.
+**Note**: The use of `os.sep` ensures that the function works across different operating systems by using the appropriate file separator for each system. The highlighting feature with '✳️' is useful for quickly identifying a specific document item within the larger tree structure.
 
-**Output Example**: 
-Assuming the following inputs:
-who_reference_me = ["folder1/fileA.txt", "folder1/folder2/fileB.txt"]
-reference_who = ["folder3/fileC.txt"]
-doc_item_path = "folder1/folder2/fileB.txt"
+**Output Example**: Given the following inputs:
+- who_reference_me = ['dir1/fileA.txt', 'dir2/subdir1/fileB.txt']
+- reference_who = ['dir1/fileC.txt', 'dir2/subdir2/fileD.txt']
+- doc_item_path = 'dir2/subdir1/fileB.txt'
 
-The output of the function could look like this:
-folder1
-    fileA.txt
-    folder2
-        ✳️fileB.txt
-folder3
-    fileC.txt
-### FunctionDef tree
-**tree**: tree函数的功能是返回一个默认字典，该字典的默认值是一个新的tree函数。
-
-**parameters**: 该函数没有参数。
-
-**Code Description**: tree函数使用了Python的collections模块中的defaultdict。defaultdict是一个字典子类，它提供了一个默认值，当访问一个不存在的键时，会自动创建一个新的值。在这个实现中，tree函数返回一个defaultdict，其中的默认值是调用tree函数本身。这意味着每当访问一个不存在的键时，defaultdict会自动创建一个新的defaultdict。这种递归的结构可以用于构建树形数据结构，其中每个节点可以有多个子节点，且子节点的数量和名称是动态生成的。
-
-**Note**: 使用此代码时，请注意避免无限递归的情况。由于tree函数返回的defaultdict的默认值是tree函数本身，因此在访问不存在的键时，会不断创建新的defaultdict，直到达到某种条件或限制。
-
-**Output Example**: 调用tree函数后，可能会得到如下结构：
+The output might look like this:
 ```
-defaultdict(<function tree at 0x...>, {
-    'key1': defaultdict(<function tree at 0x...>, {
-        'subkey1': defaultdict(<function tree at 0x...>, {}),
-        'subkey2': defaultdict(<function tree at 0x...>, {})
-    }),
-    'key2': defaultdict(<function tree at 0x...>, {})
-})
-``` 
-在这个例子中，'key1'和'key2'是顶层键，而'subkey1'和'subkey2'是'key1'下的子键。
+    dir1
+        fileA.txt
+        fileC.txt
+    dir2
+        subdir1
+            ✳️fileB.txt
+        subdir2
+            fileD.txt
+```
+### FunctionDef tree
+**tree**: This function returns a nested defaultdict where each node can recursively contain further nodes of the same structure, effectively creating a tree-like data structure.
+
+parameters:
+· No parameters: The function does not accept any input arguments.
+
+Code Description: Detailed analysis and description.
+The `tree` function utilizes Python's `defaultdict` from the `collections` module to create a recursive data structure. A `defaultdict` is similar to a regular dictionary but automatically initializes missing keys with a default value, which in this case is another `tree`. This means that whenever you try to access or modify a key that does not exist in the dictionary, it will automatically be created and initialized as another `defaultdict` returned by calling `tree()` again. This recursive initialization allows for an infinitely nested structure, mimicking the behavior of a tree where each node can have any number of children nodes, and those children can also have their own children.
+
+Note: Usage points.
+This function is particularly useful when you need to build a hierarchical data structure dynamically without having to check if keys exist at each level. It simplifies the process of adding new branches or leaves to the tree by automatically creating intermediate levels as needed. This makes it ideal for applications such as building nested configurations, representing file system directories, or constructing any kind of hierarchical data.
+
+Output Example: Mock up a possible appearance of the code's return value.
+While the function itself does not produce an output in the traditional sense (it returns a callable object), here is how you might use the returned structure:
+
+```python
+from collections import defaultdict
+
+def tree():
+    return defaultdict(tree)
+
+# Create a new tree instance
+my_tree = tree()
+
+# Adding elements dynamically
+my_tree['root']['child1'] = 'value1'
+my_tree['root']['child2']['subchild1'] = 'value2'
+
+# Accessing the structure
+print(my_tree)  # Output will show defaultdicts with nested structures
+print(my_tree['root'])  # Output: defaultdict(<function tree at ...>, {'child1': 'value1', 'child2': defaultdict(<function tree at ...>, {'subchild1': 'value2'})})
+```
+
+In this example, `my_tree` is a dynamically growing structure that can be expanded by simply assigning values to keys. The nested dictionaries are automatically created as needed, demonstrating the recursive nature of the `tree` function's return value.
 ***
 ### FunctionDef tree_to_string(tree, indent)
-**tree_to_string**: tree_to_string 函数的功能是将树形结构转换为字符串格式，便于可视化展示。
+**tree_to_string**: Converts a nested dictionary structure into a formatted string representation of a tree.
+parameters:
+· tree: A dictionary where each key-value pair represents a node and its children (if any). The keys are strings representing node names, and values can be either dictionaries (representing child nodes) or other data types.
+· indent: An integer specifying the level of indentation for nested nodes in the output string. This parameter is used internally to manage the formatting of nested structures.
 
-**parameters**: 此函数的参数如下：
-· parameter1: tree - 一个字典类型的树形结构，其中包含键值对，键为节点名称，值为子节点（可以是字典或其他类型）。
-· parameter2: indent - 一个整数，表示当前节点的缩进级别，默认为0。
+Code Description: The function `tree_to_string` takes a dictionary representing a tree structure and converts it into a human-readable string format. It iterates over each key-value pair in the dictionary, appending the key (node name) to the result string `s`. If the value associated with a key is another dictionary, indicating that there are child nodes, the function calls itself recursively, increasing the indentation level by one to visually represent the hierarchy of the tree. The recursion continues until all nodes and their children have been processed and added to the string in the correct format.
 
-**Code Description**: tree_to_string 函数通过递归的方式遍历给定的树形结构，并将其格式化为字符串。函数首先初始化一个空字符串 s，用于存储最终的结果。接着，函数对树中的每个键值对进行排序，并逐个处理每个键。对于每个键，函数会在字符串中添加相应数量的空格（由 indent 参数控制），然后添加键的名称，并换行。如果该键对应的值是一个字典，函数会递归调用自身，增加缩进级别（indent + 1），以处理子树。最终，函数返回构建好的字符串，展示了树形结构的层次关系。
+Note: This function is particularly useful for visualizing hierarchical data structures such as file systems or organizational charts in a simple text-based format. The `indent` parameter allows customization of how deeply nested nodes are visually represented, making it easier to understand the structure at a glance.
 
-**Note**: 使用此函数时，请确保传入的 tree 参数为字典类型，并且其值可以是字典或其他类型。缩进参数 indent 应为非负整数，以确保输出格式正确。
-
-**Output Example**: 假设输入的树形结构为：
+Output Example: Given the following dictionary representing a simple tree:
+```
 {
-    "根节点": {
-        "子节点1": {},
-        "子节点2": {
-            "孙节点1": {}
+    'root': {
+        'child1': {},
+        'child2': {
+            'subchild1': {}
         }
-    },
-    "另一个根节点": {}
+    }
 }
-调用 tree_to_string 函数后，返回的字符串可能如下所示：
-根节点
-    子节点1
-    子节点2
-        孙节点1
-另一个根节点
+```
+The `tree_to_string` function would produce the following string output:
+```
+    child1
+    child2
+        subchild1
+    root
+```
 ***

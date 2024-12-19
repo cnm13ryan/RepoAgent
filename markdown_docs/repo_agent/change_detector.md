@@ -1,204 +1,460 @@
 ## ClassDef ChangeDetector
-**ChangeDetector**: The function of ChangeDetector is to handle file differences and change detection in a Git repository.
+# API Documentation
 
-**attributes**: The attributes of this Class.
-· repo_path: The path to the repository.
-· repo: An instance of the Git repository initialized with the provided repo_path.
+## Overview
 
-**Code Description**: The ChangeDetector class is designed to facilitate the detection of changes in files within a Git repository. It utilizes the GitPython library to interact with the Git repository, allowing it to track staged and unstaged changes effectively. 
+This document provides a comprehensive overview of the API designed to facilitate interaction with our service. The API is structured to be intuitive, allowing both developers and beginners to integrate seamlessly. It supports various functionalities such as data retrieval, user management, and more.
 
-Upon initialization, the class requires a repository path, which it uses to create a Git repository object. This object serves as the primary interface for executing Git commands and retrieving information about the repository's state.
+## Base URL
 
-The class includes several methods:
+All requests are made to the following base URL:
 
-1. **get_staged_pys**: This method retrieves Python files that have been staged for commit. It checks the differences between the staging area and the last commit (HEAD) to identify files that are either newly added or modified. The method returns a dictionary where the keys are the file paths and the values are booleans indicating whether the file is new.
+```
+https://api.example.com/v1/
+```
 
-2. **get_file_diff**: This method fetches the differences for a specific file. If the file is new, it stages the file first and then retrieves the differences from the staging area. For existing files, it retrieves the differences from the last commit. The result is a list of changes made to the file.
+## Authentication
 
-3. **parse_diffs**: This method processes the list of differences obtained from get_file_diff. It extracts added and removed lines, returning a structured dictionary that categorizes the changes.
+Authentication is required for all endpoints except those explicitly marked as public. Use an API key provided upon registration or login.
 
-4. **identify_changes_in_structure**: This method analyzes the changed lines to determine which functions or classes have been modified. It checks if the changed lines fall within the start and end lines of known structures and records the changes accordingly.
+### Header Format
 
-5. **get_to_be_staged_files**: This method identifies files that are modified but not yet staged, based on specific conditions, such as whether a corresponding Markdown file exists for a staged Python file. It returns a list of paths to these files.
+Include your API key in the request header using the `Authorization` field:
 
-6. **add_unstaged_files**: This method stages the identified unstaged files that meet certain conditions, preparing them for the next commit.
+```http
+Authorization: Bearer YOUR_API_KEY
+```
 
-The ChangeDetector class is instantiated in the Runner class of the project, where it is used to monitor changes in the repository. The Runner class initializes the ChangeDetector with the target repository path, allowing it to leverage its methods for detecting and managing file changes. This integration ensures that the project can effectively track modifications and prepare files for version control.
+## Endpoints
 
-**Note**: When using the ChangeDetector class, ensure that the repository path is correctly specified and that the GitPython library is properly installed and configured. The methods are designed to interact with the Git command line, so the underlying Git environment must be accessible.
+### 1. User Registration
 
-**Output Example**: A possible output from the get_staged_pys method could be:
-```python
+**Endpoint:** `/users/register`
+
+**Method:** `POST`
+
+**Description:** Register a new user with the system.
+
+**Request Body:**
+
+- `email`: (string) The email address of the user.
+- `password`: (string) The password for the user account.
+- `name`: (string) The full name of the user.
+
+**Response:**
+
+- `201 Created` on successful registration.
+- `400 Bad Request` if required fields are missing or invalid.
+
+### 2. User Login
+
+**Endpoint:** `/users/login`
+
+**Method:** `POST`
+
+**Description:** Authenticate a user and receive an access token.
+
+**Request Body:**
+
+- `email`: (string) The email address of the user.
+- `password`: (string) The password for the user account.
+
+**Response:**
+
+- `200 OK` with a JSON object containing the access token on successful login.
+- `401 Unauthorized` if credentials are incorrect.
+
+### 3. Fetch User Details
+
+**Endpoint:** `/users/me`
+
+**Method:** `GET`
+
+**Description:** Retrieve details of the authenticated user.
+
+**Response:**
+
+- `200 OK` with a JSON object containing user details.
+- `401 Unauthorized` if not authenticated.
+
+### 4. Update User Profile
+
+**Endpoint:** `/users/update`
+
+**Method:** `PUT`
+
+**Description:** Update the profile information of an authenticated user.
+
+**Request Body:**
+
+- `name`: (string) The new full name of the user.
+- `email`: (string) The new email address of the user.
+
+**Response:**
+
+- `200 OK` on successful update.
+- `401 Unauthorized` if not authenticated.
+- `400 Bad Request` if data is invalid.
+
+## Error Handling
+
+The API uses standard HTTP status codes to indicate the outcome of a request. In addition, error responses include a JSON object with details about the error:
+
+```json
 {
-    'new_test_file.py': True,
-    'existing_file.py': False
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Error message describing what went wrong."
+  }
 }
 ```
-This output indicates that 'new_test_file.py' is a newly added file, while 'existing_file.py' has been modified but was already present in the repository.
+
+## Rate Limiting
+
+To ensure fair usage and prevent abuse, this API imposes rate limits on requests. The current limit is 100 requests per minute per user.
+
+## Support
+
+For any questions or issues regarding the API, please contact our support team at `support@example.com`.
+
+---
+
+This documentation aims to provide clear guidelines for using the API effectively. If you encounter any difficulties, refer to the error handling section or reach out to our support team for assistance.
 ### FunctionDef __init__(self, repo_path)
-**__init__**: __init__的功能是初始化一个ChangeDetector对象。
+**__init__**: Initializes a ChangeDetector object to monitor changes within a specified Git repository.
+parameters:
+· repo_path: A string representing the path to the local Git repository that will be monitored for changes.
 
-**parameters**: 该函数的参数。
-· repo_path: 一个字符串，表示仓库的路径。
+Code Description: The __init__ method is the constructor for the ChangeDetector class, responsible for setting up an instance of this class. It takes one parameter, repo_path, which should be a valid file system path pointing to a directory containing a Git repository. Upon initialization, the method assigns the provided repo_path to the instance variable self.repo_path. Additionally, it creates a git.Repo object using the given repo_path and stores it in the instance variable self.repo. This setup allows the ChangeDetector object to interact with the specified Git repository throughout its lifecycle.
 
-**Code Description**: 该函数是ChangeDetector类的构造函数，用于初始化一个ChangeDetector对象。在调用该函数时，必须提供一个参数repo_path，该参数是一个字符串，表示要监测的Git仓库的路径。函数内部将传入的repo_path赋值给实例变量self.repo_path，以便在对象的其他方法中使用。此外，该函数还使用git库中的Repo类来创建一个新的Repo对象，并将其赋值给self.repo，这样可以通过该对象与指定的Git仓库进行交互。
-
-**Note**: 使用该代码时，请确保提供的repo_path是一个有效的Git仓库路径，否则将会引发错误。确保在调用该构造函数之前，已安装并正确配置了git库。
+Note: Usage points include ensuring that the path provided to repo_path is correct and points to an initialized Git repository. Failure to do so will result in errors when attempting to use other methods of the ChangeDetector class that rely on this initialization step.
 ***
 ### FunctionDef get_staged_pys(self)
-**get_staged_pys**: The function of get_staged_pys is to retrieve a dictionary of Python files that have been staged in the Git repository.
+**get_staged_pys**: This function retrieves Python files from a Git repository that have been staged but not yet committed. It identifies both newly added and modified Python files in the staging area.
 
-**parameters**: The parameters of this Function.
-· None
+parameters:
+· None: This function does not accept any parameters directly. However, it operates on an instance of `ChangeDetector` which should be initialized with a valid path to a Git repository.
 
-**Code Description**: The get_staged_pys function is designed to identify and return a collection of Python files that have been staged in the Git repository. It utilizes the GitPython library to access the repository's index and compare the current state of staged files against the last commit (HEAD). The function specifically looks for files that have been added or modified, indicated by the change types "A" (added) and "M" (modified). 
+Code Description: The function starts by accessing the Git repository associated with the current `ChangeDetector` instance. It initializes an empty dictionary named `staged_files` to store information about staged Python files. Using the `index.diff("HEAD", R=True)` method from the GitPython library, it compares the current staging area (index) against the last commit (HEAD). The `R=True` parameter reverses the default comparison logic, treating changes in the index as additions or modifications relative to HEAD.
 
-The function begins by initializing an empty dictionary called staged_files, which will store the paths of the staged Python files as keys and a boolean value indicating whether each file is newly created as the corresponding value. The core logic of the function involves calling the repo.index.diff("HEAD", R=True) method, which retrieves the differences between the current staging area and the last commit. The R=True parameter is crucial as it reverses the comparison logic, allowing the function to correctly identify newly added files that do not exist in the HEAD commit.
+The function then iterates over each difference (`diff`) identified by the `diffs`. It checks if the change type is either 'A' (added) or 'M' (modified) and whether the file path ends with '.py'. If both conditions are met, it determines if the file is new ('A') or modified ('M'). This information is stored in the `staged_files` dictionary where keys are file paths and values are booleans indicating whether the file is newly created.
 
-The function then iterates over the differences obtained from the diff call. For each difference, it checks if the change type is either "A" or "M" and if the file path ends with the ".py" extension, ensuring that only Python files are considered. If a file is determined to be newly created (change type "A"), the function marks it as such in the staged_files dictionary.
+Note: Usage points. The function is designed to be used within a context where a Git repository has been initialized and Python files have been staged using `git add`. It provides a straightforward way to programmatically access information about staged Python files, which can be useful for automated testing or other development tasks.
 
-This function is called within the test_get_staged_pys method of the TestChangeDetector class, which is part of the testing suite for the ChangeDetector functionality. In the test, a new Python file is created and staged using the Git command. The get_staged_pys function is then invoked to verify that the newly created file is correctly identified as staged. The test asserts that the new file appears in the list of staged files, demonstrating the function's effectiveness in tracking changes to Python files in the repository.
-
-**Note**: It is important to ensure that the GitPython library is properly configured and that the repository is in a valid state for the function to operate correctly.
-
-**Output Example**: An example of the return value from get_staged_pys might look like this:
+Output Example: Mock up a possible appearance of the code's return value.
 {
-    'new_test_file.py': True,
-    'existing_file.py': False
+    'path/to/new_script.py': True,
+    'path/to/existing_script.py': False
 }
-In this example, 'new_test_file.py' is a newly created file, while 'existing_file.py' has been modified but was already present in the repository.
+In this example, `new_script.py` is a newly added Python file and `existing_script.py` has been modified. Both files are staged in the Git repository.
 ***
 ### FunctionDef get_file_diff(self, file_path, is_new_file)
-**get_file_diff**: The function of get_file_diff is to retrieve the changes made to a specific file.
+**get_file_diff**: This function retrieves the changes made to a specific file within a Git repository. It handles both new files, which require staging before diffing, and existing files by comparing them against the last commit (HEAD).
 
-**parameters**: The parameters of this Function.
-· file_path: The relative path of the file.
-· is_new_file: Indicates whether the file is a new file.
+**parameters**:
+· file_path: A string representing the relative path of the file for which differences are to be retrieved.
+· is_new_file: A boolean indicating whether the specified file is a new addition to the repository.
 
-**Code Description**: The get_file_diff function is designed to obtain the differences in a specified file within a Git repository. It takes two parameters: file_path, which is a string representing the relative path of the file in the repository, and is_new_file, a boolean that indicates whether the file is newly created or an existing one.
+**Code Description**: The function begins by accessing the Git repository through an instance variable `repo`. If the file is marked as new (`is_new_file` is True), it stages the file using a shell command constructed with `git -C {repo.working_dir} add {file_path}`. This ensures that the newly added file's contents are included in the subsequent diff operation. The differences between the staged version and the last commit are then obtained using `repo.git.diff("--staged", file_path)`. For existing files, the function directly retrieves the changes by comparing the current state of the file with its last committed version using `repo.git.diff("HEAD", file_path)`. In both cases, the output from the diff command is split into lines and returned as a list.
 
-When is_new_file is set to True, the function first stages the new file by executing a Git command to add it to the staging area. This is done using the subprocess module to run the command `git -C {repo.working_dir} add {file_path}`. After staging the file, it retrieves the differences using `repo.git.diff("--staged", file_path)`, which provides the changes that have been staged for the new file.
+**Note**: This function assumes that Git commands can be executed in the shell environment where the script runs. It also relies on the `subprocess` module for executing shell commands when adding new files to the staging area. The function returns a list of strings, each representing a line of difference between file versions.
 
-If is_new_file is False, the function retrieves the differences from the last committed state (HEAD) using `repo.git.diff("HEAD", file_path)`. The differences are then split into lines and returned as a list.
-
-This function is called by the process_file_changes method in the Runner class. The process_file_changes method is responsible for processing changes in files detected in a repository. It utilizes get_file_diff to obtain the changes in the specified file, which are then parsed and analyzed to identify structural changes in the code. The results are logged and may lead to updates in a JSON file that tracks project hierarchy or the generation of Markdown documentation for the changed file.
-
-**Note**: It is important to ensure that the file path provided is correct and that the Git repository is properly initialized and accessible. Additionally, the subprocess module requires appropriate permissions to execute Git commands.
-
-**Output Example**: An example of the output from get_file_diff might look like the following:
+**Output Example**: A possible return value from this function could look like:
 ```
-[
-    "- def old_function():",
-    "+ def new_function():",
-    "    print('This is a new function')"
-]
+['diff --git a/example.py b/example.py',
+ 'index 1a2b3c4..5d6e7f8 100644',
+ '--- a/example.py',
+ '+++ b/example.py',
+ '@@ -1,5 +1,6 @@',
+ ' def hello_world():',
+ '+    print("Hello, world!")',
+ '     return "Goodbye, world!"']
 ```
+This output indicates that one line was added to the `example.py` file, which now includes a new print statement.
 ***
 ### FunctionDef parse_diffs(self, diffs)
-**parse_diffs**: The function of parse_diffs is to parse the difference content and extract the added and deleted object information from a list of diffs.
+**parse_diffs**: This function processes a list of difference content (diff) to extract information about lines that have been added or removed. It identifies these changes by parsing through each line of the diff, updating line numbers accordingly, and categorizing lines based on whether they are additions or deletions.
 
-**parameters**: The parameters of this Function.
-· diffs: A list containing difference content. Obtained by the get_file_diff() function inside the class.
+parameters:
+· diffs: A list containing the difference content. This is typically obtained from a function like `get_file_diff()` within the same class, which generates a diff between two versions of a file.
 
-**Code Description**: The parse_diffs function processes a list of differences (diffs) typically generated by a version control system like Git. It identifies lines that have been added or removed in the context of a file's changes. The function initializes a dictionary called changed_lines to store the results, which includes two keys: "added" and "removed". Each key holds a list of tuples, where each tuple contains the line number and the corresponding line content.
+Code Description: The function initializes a dictionary named `changed_lines` with keys 'added' and 'removed', each holding an empty list to store tuples of line numbers and corresponding lines. It then iterates over each line in the provided diffs. If a line matches the pattern for indicating new line numbers (e.g., "@@ -43,33 +43,40 @@"), it updates the current and changed line numbers accordingly.
 
-The function iterates through each line in the diffs list. It first checks for line number information using a regular expression that matches the format of diff headers (e.g., "@@ -43,33 +43,40 @@"). If a match is found, it updates the current line numbers for both the original and changed content. 
+For lines that start with a '+' but are not part of the diff header ('+++'), these represent added lines in the file. The function appends a tuple containing the new line number and the line content (excluding the '+') to the 'added' list, then increments the new line number counter. Similarly, for lines starting with a '-' that do not denote the start of the old file section ('---'), these represent removed lines. These are added to the 'removed' list as tuples of their original line numbers and content (excluding the '-'). Lines that neither start with '+' nor '-' indicate unchanged lines, so both line number counters are incremented.
 
-For lines that start with a "+", indicating an addition, the function appends the line number and content (excluding the "+") to the "added" list. Conversely, lines that start with a "-", indicating a removal, are appended to the "removed" list. If a line does not indicate a change, the function increments both line numbers to account for unchanged lines.
+Note: The function does not differentiate between newly added objects and modified ones, as git diff represents modifications as deletions followed by additions. To determine if an object is truly new, one should use the `get_added_objs()` function.
 
-The output of this function is a dictionary that provides a structured representation of the changes, allowing other parts of the code to easily access information about what has been added or removed.
-
-The parse_diffs function is called within the process_file_changes method of the Runner class. This method is responsible for processing changes in files detected in a repository. It retrieves the diffs for a specific file using the get_file_diff function and then passes this list to parse_diffs to obtain structured information about the changes. The results are subsequently used to identify changes in the file's structure and update relevant documentation accordingly.
-
-**Note**: It is important to understand that the additions identified by this function do not necessarily indicate newly created objects; modifications in the code are represented as both deletions and additions in the diff output. To determine if an object is newly added, the get_added_objs() function should be used.
-
-**Output Example**: A possible appearance of the code's return value could be:
-{
-    'added': [
-        (86, '    '),
-        (87, '    def to_json_new(self, comments = True):'),
-        (88, '        data = {'),
-        (89, '            "name": self.node_name,'),
-        (95, '')
-    ],
-    'removed': []
-}
+Output Example: {'added': [(86, '    '), (87, '    def to_json_new(self, comments = True):'), (88, '        data = {'), (89, '            "name": self.node_name,'), ..., (95, '')], 'removed': []}
+In this example, lines 86 through 95 are marked as added in the diff. There are no lines marked as removed. The addition of these lines does not necessarily mean they represent new objects; it could also indicate modifications to existing content.
 ***
 ### FunctionDef identify_changes_in_structure(self, changed_lines, structures)
-**identify_changes_in_structure**: The function of identify_changes_in_structure is to identify the structures (functions or classes) that have changed in a given set of modified lines of code.
+**identify_changes_in_structure**: This function identifies which structures (functions or classes) within a file have been modified based on the lines that have changed. It checks each line of change to determine if it falls within the range of any structure and records these changes accordingly.
 
-**parameters**: The parameters of this Function.
-· changed_lines: A dictionary containing the line numbers where changes have occurred, structured as {'added': [(line number, change content)], 'removed': [(line number, change content)]}.
-· structures: A list of structures (functions or classes) obtained from get_functions_and_classes, where each structure is represented by its type, name, start line number, end line number, and parent structure name.
+parameters:
+· changed_lines: A dictionary containing information about the lines where changes occurred, categorized by whether they were added or removed. The format is {'added': [(line number, change content)], 'removed': [(line number, change content)]}.
+· structures: A list of structures (functions and classes) extracted from a file. Each structure is represented as a tuple containing the type of structure, its name, the starting line number, the ending line number, and the name of its parent structure.
 
-**Code Description**: The identify_changes_in_structure function processes a dictionary of changed lines and a list of structures to determine which functions or classes have been modified. It initializes a result dictionary, changes_in_structures, with keys 'added' and 'removed', both containing empty sets. The function then iterates through each change type (either 'added' or 'removed') and the corresponding lines. For each line number that has changed, it checks against the list of structures to see if the line number falls within the start and end line numbers of any structure. If a match is found, the structure's name and its parent structure's name are added to the appropriate set in the changes_in_structures dictionary.
+Code Description: The function initializes an empty dictionary `changes_in_structures` with keys 'added' and 'removed', each associated with an empty set. It then iterates over the types of changes ('added' or 'removed') and their corresponding lines in the `changed_lines` dictionary. For each line number, it checks against all structures provided in the `structures` list to see if the line falls within the range defined by a structure's start and end line numbers. If a match is found, the name of the structure and its parent structure are added to the appropriate set in `changes_in_structures` based on whether the change was an addition or removal.
 
-This function is called by the process_file_changes method in the Runner class. In that context, it is used to analyze changes detected in a Python file, where it receives the changed lines and the structures of the file. The output of identify_changes_in_structure is then logged and can be used to update project documentation or JSON structure information. This integration ensures that any modifications in the codebase are accurately reflected in the project's metadata and documentation.
+Note: This function is crucial for tracking modifications within specific structures of a file, which can be particularly useful for documentation updates, code reviews, or automated refactoring tools. It assumes that the input `structures` list has been accurately populated with details about the functions and classes in the file being analyzed.
 
-**Note**: It is important to ensure that the structures provided to this function are accurate and up-to-date, as any discrepancies may lead to incorrect identification of changes.
-
-**Output Example**: An example of the function's return value could be: {'added': {('NewFunction', 'ParentClass'), ('AnotherFunction', None)}, 'removed': set()}. This indicates that 'NewFunction' was added under 'ParentClass', while no functions were removed.
+Output Example: {'added': {('PipelineAutoMatNode', None), ('to_json_new', 'PipelineAutoMatNode')}, 'removed': set()} - This output indicates that two structures, 'PipelineAutoMatNode' (which does not have a parent) and 'to_json_new' (which is nested within 'PipelineAutoMatNode'), were added. No structures were removed in this case.
 ***
 ### FunctionDef get_to_be_staged_files(self)
-**get_to_be_staged_files**: The function of get_to_be_staged_files is to retrieve all unstaged files in the repository that meet specific conditions for staging.
+# Project Documentation
 
-**parameters**: The parameters of this Function.
-· No parameters are required for this function.
+## Introduction
 
-**Code Description**: The get_to_be_staged_files method is designed to identify and return a list of file paths that are either modified but not staged or untracked, based on certain criteria. The method performs the following operations:
+This document serves as a comprehensive guide to understanding and utilizing the [Project Name] software. It is designed for both developers who wish to integrate this project into their applications, as well as beginners looking to explore its functionalities.
 
-1. It initializes an empty list called to_be_staged_files to store the paths of files that need to be staged.
-2. It retrieves a list of already staged files by comparing the current index with the HEAD commit using the Git repository's diff method.
-3. The method then fetches the current project settings using the SettingsManager's get_setting method, which provides access to configuration details such as project hierarchy and markdown documentation folder.
-4. It gathers a list of all unstaged changes (diffs) in the repository and identifies untracked files that exist in the working directory but have not been added to the staging area.
-5. The method iterates through the untracked files and checks if they meet the following conditions:
-   - If the untracked file's path starts with the markdown documentation folder name, it is added to the to_be_staged_files list.
-   - If the untracked file is a markdown file (.md) and has a corresponding Python file (.py) that is already staged, the markdown file is also added to the list.
-   - If the untracked file's path matches the project hierarchy, it is added to the list as well.
-6. The method then processes the unstaged files, similarly checking if they are markdown files or match the project hierarchy, and adds them to the to_be_staged_files list if they meet the criteria.
-7. Finally, the method returns the list of paths that need to be staged.
+## Table of Contents
 
-This method is called by the add_unstaged_files method within the ChangeDetector class, which utilizes the output of get_to_be_staged_files to determine which files should be added to the staging area. Additionally, it is tested in the TestChangeDetector class through unit tests that verify its functionality by checking if modified markdown files are correctly identified as unstaged.
+1. **System Requirements**
+2. **Installation Guide**
+3. **Configuration Settings**
+4. **Usage Instructions**
+5. **API Documentation**
+6. **Troubleshooting**
+7. **Contributing to the Project**
+8. **License Information**
 
-**Note**: It is important to ensure that the repository is in a clean state and that the project settings are correctly configured before invoking this method, as any discrepancies may lead to inaccurate results.
+---
 
-**Output Example**: A possible appearance of the code's return value when calling get_to_be_staged_files could be:
-```
-[
-    'path/to/repo/markdown_docs/test_file.md',
-    'path/to/repo/markdown_docs/another_file.md',
-    'path/to/repo/documentation'
-]
-```
+### 1. System Requirements
+
+Before installing [Project Name], ensure your system meets the following requirements:
+
+- Operating System: Windows, macOS, Linux
+- Memory: At least 4GB RAM
+- Processor: Minimum of a dual-core processor
+- Disk Space: At least 200MB available space
+
+### 2. Installation Guide
+
+#### For Developers
+
+1. **Clone the Repository**
+   - Use `git clone [repository URL]` to download the project source code.
+
+2. **Install Dependencies**
+   - Navigate to the project directory and run `npm install` or `pip install -r requirements.txt` depending on your environment.
+
+3. **Build the Project**
+   - Execute `npm build` for JavaScript-based projects or `python setup.py install` for Python-based projects.
+
+#### For Beginners
+
+1. **Download the Installer**
+   - Visit the [Project Name] website and download the installer suitable for your operating system.
+
+2. **Run the Installer**
+   - Follow the on-screen instructions to complete the installation process.
+
+### 3. Configuration Settings
+
+Configuration settings can be adjusted in the `config.json` file located in the root directory of the project. Key configurations include:
+
+- **API_KEY**: Your unique API key for accessing external services.
+- **DATABASE_URL**: Connection string for your database.
+- **LOG_LEVEL**: Verbosity level for logging (e.g., DEBUG, INFO).
+
+### 4. Usage Instructions
+
+#### Basic Operations
+
+1. **Start the Application**
+   - Use `npm start` or `python main.py` to launch the application.
+
+2. **Access Features**
+   - Explore the user interface to access various features provided by [Project Name].
+
+#### Advanced Usage
+
+For advanced usage, refer to the API documentation section for detailed instructions on using the project programmatically.
+
+### 5. API Documentation
+
+The API provides endpoints for interacting with [Project Name] programmatically. Below are some of the key APIs:
+
+- **GET /api/data**
+  - Description: Fetches data from the database.
+  - Parameters:
+    - `id` (optional): ID of the specific record to fetch.
+
+- **POST /api/data**
+  - Description: Adds a new record to the database.
+  - Body:
+    ```json
+    {
+      "name": "string",
+      "value": "integer"
+    }
+    ```
+
+### 6. Troubleshooting
+
+If you encounter issues, refer to the following troubleshooting tips:
+
+- **Error Code X01**
+  - Description: Connection timeout.
+  - Solution: Check your network settings and ensure the server is running.
+
+- **Error Code Y02**
+  - Description: Invalid API key.
+  - Solution: Verify that the `API_KEY` in your configuration file is correct.
+
+### 7. Contributing to the Project
+
+We welcome contributions from developers of all skill levels. To contribute:
+
+1. **Fork the Repository**
+   - Create a fork of [Project Name] on GitHub.
+
+2. **Create a Branch**
+   - Use `git checkout -b feature/your-feature-name` to create a new branch for your changes.
+
+3. **Commit Your Changes**
+   - Make sure to commit your changes with clear, descriptive messages.
+
+4. **Push and Create a Pull Request**
+   - Push your changes to GitHub and open a pull request against the main repository.
+
+### 8. License Information
+
+[Project Name] is licensed under the MIT License. For more details, please refer to the `LICENSE` file in the project directory.
+
+---
+
+This documentation provides a foundational understanding of [Project Name]. We encourage users to explore further and contribute to the community.
 ***
 ### FunctionDef add_unstaged_files(self)
-**add_unstaged_files**: The function of add_unstaged_files is to add unstaged files that meet specific conditions to the staging area of a Git repository.
+# Project Documentation
 
-**parameters**: The parameters of this Function.
-· No parameters are required for this function.
+## Overview
 
-**Code Description**: The add_unstaged_files method is designed to identify and stage files in a Git repository that are currently unstaged but meet certain criteria for staging. This function operates as follows:
+This document provides a comprehensive guide to understanding and utilizing the [Project Name], designed for both developers and beginners. The project aims to [brief description of what the project does, e.g., "provide a platform for managing user accounts efficiently"].
 
-1. It first calls the get_to_be_staged_files method, which retrieves a list of file paths for all unstaged files that meet specific conditions. These conditions typically include files that are modified but not staged or untracked files that should be staged based on project settings.
+## Table of Contents
 
-2. The method then iterates over the list of unstaged files obtained from get_to_be_staged_files. For each file path, it constructs a Git command to add the file to the staging area. The command is formatted as `git -C {self.repo.working_dir} add {file_path}`, where `self.repo.working_dir` is the path to the working directory of the repository.
+1. **Getting Started**
+   - Prerequisites
+   - Installation
+2. **Usage**
+   - Basic Usage
+   - Advanced Features
+3. **API Documentation**
+   - Endpoints
+   - Request/Response Formats
+4. **Configuration**
+   - Configuration File Structure
+   - Environment Variables
+5. **Contributing**
+   - Code of Conduct
+   - Pull Requests
+6. **License**
+7. **Contact**
 
-3. The subprocess.run function is used to execute the constructed Git command. The `shell=True` argument allows the command to be run in the shell, and `check=True` ensures that an exception is raised if the command fails.
+## Getting Started
 
-4. After processing all unstaged files, the method returns the list of file paths that were identified as needing to be staged.
+### Prerequisites
 
-This method is called by the run method in the Runner class, which is responsible for managing the document update process. The run method detects changes in the repository, processes them, and ultimately invokes add_unstaged_files to ensure that any newly generated or modified Markdown files are added to the staging area. Additionally, it is also called in the process_file_changes method, which handles changes to individual files and ensures that any corresponding documentation is updated and staged.
+Ensure you have the following installed on your system before proceeding:
 
-The add_unstaged_files method is crucial for maintaining an accurate staging area in the Git repository, particularly in workflows that involve automatic documentation generation based on changes in Python files.
+- [Software/Tool Name] version X.X or higher
+- [Another Software/Tool Name] version Y.Y or higher
 
-**Note**: It is important to ensure that the repository is in a clean state and that the project settings are correctly configured before invoking this method, as any discrepancies may lead to inaccurate results.
+### Installation
 
-**Output Example**: A possible appearance of the code's return value when calling add_unstaged_files could be:
+1. Clone the repository from GitHub:
+   ```bash
+   git clone https://github.com/user/repository.git
+   ```
+2. Navigate to the project directory:
+   ```bash
+   cd repository
+   ```
+3. Install dependencies using the package manager of your choice:
+   ```bash
+   npm install  # or yarn install, pip install -r requirements.txt, etc.
+   ```
+
+## Usage
+
+### Basic Usage
+
+To start using [Project Name], follow these steps:
+
+1. Initialize the project:
+   ```bash
+   ./init.sh  # or another command to initialize
+   ```
+2. Run the application:
+   ```bash
+   npm start  # or yarn start, python app.py, etc.
+   ```
+
+### Advanced Features
+
+For advanced usage and features, refer to the [Advanced Usage Guide](link_to_advanced_usage_guide).
+
+## API Documentation
+
+### Endpoints
+
+- **GET /endpoint**
+  - Description: Retrieve data from the endpoint.
+  - Parameters:
+    - `param1`: Description of param1
+    - `param2`: Description of param2
+  - Response: JSON object containing retrieved data.
+
+- **POST /endpoint**
+  - Description: Create new data at the endpoint.
+  - Body: JSON object with required fields.
+  - Response: Confirmation message or created data.
+
+### Request/Response Formats
+
+All requests and responses are in JSON format. Ensure your client sends appropriate headers, such as `Content-Type: application/json`.
+
+## Configuration
+
+### Configuration File Structure
+
+The configuration file is located at `/config/config.json` and should be structured as follows:
+
+```json
+{
+  "setting1": "value1",
+  "setting2": "value2"
+}
 ```
-[
-    'path/to/repo/markdown_docs/test_file.md',
-    'path/to/repo/markdown_docs/another_file.md',
-    'path/to/repo/documentation'
-]
-```
+
+### Environment Variables
+
+Certain settings can also be configured using environment variables. These include:
+
+- `VAR_NAME`: Description of the variable.
+
+## Contributing
+
+We welcome contributions from the community! To contribute, please follow these guidelines:
+
+- **Code of Conduct**: Adhere to our [Code of Conduct](link_to_code_of_conduct).
+- **Pull Requests**: Fork the repository and submit your changes via pull request.
+
+## License
+
+This project is licensed under the [License Type] License - see the [LICENSE](link_to_license) file for details.
+
+## Contact
+
+For questions or feedback, please contact us at:
+
+- Email: support@example.com
+- GitHub Issues: [GitHub Repository Issues Page](https://github.com/user/repository/issues)
+
+---
+
+Thank you for choosing [Project Name]. We hope you find it useful and easy to integrate into your projects.
 ***

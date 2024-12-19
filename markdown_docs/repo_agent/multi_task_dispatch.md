@@ -1,162 +1,137 @@
 ## ClassDef Task
-**Task**: The function of Task is to represent a unit of work with its dependencies and status.
+**Task**: Represents a task within a multi-task dispatch system, including its ID, dependencies, extra information, and status.
 
-**attributes**: The attributes of this Class.
-· task_id: An integer that uniquely identifies the task.
-· dependencies: A list of Task objects that this task depends on.
-· extra_info: Any additional information associated with the task, which can be of any type.
-· status: An integer representing the current status of the task (0 for not started, 1 for in progress, 2 for completed, 3 for error).
+attributes:
+· task_id: An integer representing the unique identifier for this task.
+· dependencies: A list of Task objects that this task depends on before it can be executed.
+· extra_info: Any additional information associated with the task. This can be of any type (None by default).
+· status: An integer indicating the current state of the task, where 0 means not started, 1 means in progress, 2 means completed, and 3 indicates an error.
 
-**Code Description**: The Task class is designed to encapsulate the concept of a task within a multi-tasking framework. Each Task object is initialized with a unique identifier (task_id), a list of dependencies that must be completed before this task can start, and optional extra information that can provide context or metadata about the task. The status attribute tracks the current state of the task, allowing for management and monitoring of its progress.
+Code Description: The Task class is designed to encapsulate all necessary information about a task within a system that manages multiple tasks concurrently. Upon initialization, it takes three parameters: `task_id`, which uniquely identifies the task; `dependencies`, a list of other Task objects that must be completed before this task can begin; and `extra_info`, which allows for any additional data to be associated with the task (default is None). The status attribute is initialized to 0, indicating that the task has not yet started.
 
-The Task class is utilized within the MultiTaskDispatch system, where it plays a crucial role in task management. Specifically, the TaskManager class, which is responsible for managing multiple tasks, creates instances of the Task class when new tasks are added. The add_task method in TaskManager takes a list of dependency task IDs and creates a new Task object, linking it to its dependencies. This relationship ensures that tasks are executed in the correct order based on their dependencies.
-
-Furthermore, the Task class is referenced in the print_task_list method of the MetaInfo class, which formats and displays a list of tasks along with their statuses and dependencies. This integration highlights the importance of the Task class in providing a structured way to manage and visualize tasks within the system.
-
-**Note**: When using the Task class, it is important to ensure that the dependencies are properly managed to avoid circular dependencies, which could lead to errors in task execution. Additionally, the status attribute should be updated appropriately to reflect the current state of the task throughout its lifecycle.
+Note: Developers should ensure that dependencies are correctly specified as a list of Task objects. The extra_info parameter provides flexibility in attaching relevant information to each task, which can be useful for tracking and debugging purposes. The status attribute can be updated by other parts of the system to reflect changes in the task's state (e.g., when it starts, completes, or encounters an error). This class is typically used in conjunction with a TaskManager that handles the creation, management, and execution of tasks based on their dependencies and statuses.
 ### FunctionDef __init__(self, task_id, dependencies, extra_info)
-**__init__**: The function of __init__ is 初始化任务对象。
+**__init__**: Initializes a new Task object with specified task ID, dependencies, and optional extra information.
 
-**parameters**: The parameters of this Function.
-· parameter1: task_id (int) - 任务的唯一标识符。
-· parameter2: dependencies (List[Task]) - 该任务所依赖的其他任务列表。
-· parameter3: extra_info (Any, 可选) - 额外的信息，可以是任何类型的数据，默认为None。
+parameters:
+· task_id: An integer representing the unique identifier for the task.
+· dependencies: A list of Task objects that this task depends on before it can be executed.
+· extra_info: Optional parameter that can hold any additional information related to the task. This could be any data type (default is None).
 
-**Code Description**: 该__init__函数是任务类的构造函数，用于初始化任务对象的基本属性。首先，它接收一个整数类型的参数task_id，用于唯一标识该任务。接着，dependencies参数是一个任务对象的列表，表示当前任务所依赖的其他任务，这对于任务调度和执行顺序非常重要。extra_info参数是一个可选参数，可以存储与任务相关的额外信息，默认为None。最后，status属性被初始化为0，表示任务的初始状态为“未开始”。状态值的定义如下：0表示未开始，1表示正在进行，2表示已经完成，3表示出错了。
+Code Description: The __init__ method sets up a new instance of the Task class with the provided parameters. It assigns the task_id and extra_info directly to the instance variables self.task_id and self.extra_info, respectively. The dependencies parameter, which should be a list of other Task objects that must be completed before this task can start, is also assigned to an instance variable. Additionally, a status attribute is initialized with a value of 0, indicating that the task has not yet started. This status code system uses 0 for '未开始' (not started), 1 for '正在进行' (in progress), 2 for '已经完成' (completed), and 3 for '出错了' (errored).
 
-**Note**: 在使用该构造函数时，确保传入的dependencies参数是一个有效的任务列表，以避免在后续任务调度中出现错误。同时，task_id应保持唯一性，以确保任务的正确识别和管理。
+Note: When creating a Task object, ensure that the task_id is unique within the context of your application to avoid confusion. The dependencies list should only include tasks that logically need to be completed before this one can begin. The extra_info parameter provides flexibility in storing any additional data relevant to the task, which can be useful for tracking or logging purposes.
 ***
 ## ClassDef TaskManager
-**TaskManager**: The function of TaskManager is to manage and dispatch multiple tasks based on their dependencies.
+**TaskManager**: TaskManager is a class designed to manage multiple tasks in a multi-threaded environment. It handles task creation, dependency management, retrieval of next available tasks, and marking tasks as completed.
 
-**attributes**: The attributes of this Class.
-· task_dict: A dictionary that maps task IDs to Task objects.  
-· task_lock: A threading.Lock used for thread synchronization when accessing the task_dict.  
-· now_id: An integer representing the current task ID.  
-· query_id: An integer representing the current query ID.  
-· sync_func: A placeholder for a synchronization function, initially set to None.  
+attributes:
+· task_dict (Dict[int, Task]): A dictionary mapping unique task IDs to their corresponding Task objects.
+· task_lock (threading.Lock): A lock used for thread synchronization when accessing or modifying the task_dict.
+· now_id (int): The current highest task ID assigned; it increments with each new task added.
+· query_id (int): Tracks the number of queries made for next tasks, useful for debugging and logging purposes.
 
-**Code Description**: The TaskManager class is designed to facilitate the management of multiple tasks in a concurrent environment. It initializes with an empty task dictionary (task_dict) that will hold Task objects indexed by their unique IDs. The class employs a threading lock (task_lock) to ensure that access to the task dictionary is thread-safe, preventing race conditions when multiple threads attempt to modify the task list simultaneously.
+Code Description: TaskManager initializes with an empty dictionary to store tasks, a lock for thread safety, and counters for task IDs and query IDs. The class provides methods to add tasks with dependencies, retrieve the next available task based on dependencies and status, and mark tasks as completed by removing them from the dictionary after updating dependent tasks.
 
-The now_id attribute keeps track of the next available task ID, while query_id is used to track the number of queries made for tasks. The sync_func attribute is intended to hold a function that can be called for synchronization purposes, though it is not defined upon initialization.
+The `add_task` method accepts a list of dependency task IDs and optional extra information, creating a new Task object that is added to the task_dict. It ensures thread safety using self.task_lock when modifying the shared data structure.
 
-The class provides several key methods:
-- **all_success**: A property that checks if all tasks have been completed by verifying if the task dictionary is empty.
-- **add_task**: This method allows the addition of a new task to the task dictionary. It takes a list of dependency task IDs and optional extra information. The method locks the task dictionary during the addition process to ensure thread safety, creates a new Task object, and increments the now_id for the next task.
-- **get_next_task**: This method retrieves the next available task for a specified process ID. It checks the task dictionary for tasks that have no dependencies and are not currently in progress. If a task is found, it updates its status to indicate that it is now being processed and may call the sync_func every ten queries.
-- **mark_completed**: This method marks a specified task as completed and removes it from the task dictionary. It also updates the dependencies of other tasks that may rely on the completed task.
+The `get_next_task` method checks for tasks without dependencies and an unprocessed status (status == 0). If such a task is found, it updates its status to indicate processing (status = 1) and returns the task along with its ID. This method also ensures thread safety by using self.task_lock.
 
-The TaskManager class is utilized within the MetaInfo class in the repo_agent/doc_meta_info.py file. Specifically, it is called in the methods get_task_manager and get_topology. The get_task_manager method constructs a TaskManager instance and populates it with tasks based on the dependencies of document items in a hierarchical structure. The get_topology method orchestrates the overall process of calculating the topological order of all objects in a repository, leveraging the TaskManager to manage the tasks that arise from this calculation.
+The `mark_completed` method removes a completed task from the task_dict and updates the dependencies of other tasks that depend on the completed one. It ensures thread safety when modifying shared data structures.
 
-**Note**: When using the TaskManager, ensure that the sync_func is properly defined if synchronization is required during task processing. Additionally, be aware of potential circular dependencies in task management, which may complicate the task retrieval process.
+Note: Usage points include initializing TaskManager, adding tasks with their dependencies, retrieving next available tasks for processing, and marking tasks as completed once processed. Developers should ensure proper synchronization when using this class in a multi-threaded environment to avoid race conditions.
 
-**Output Example**: A possible return value from the get_next_task method could be a tuple containing a Task object and its ID, such as (Task(task_id=0, dependencies=[], extra_info=None), 0), indicating that the task with ID 0 is ready for processing.
+Output Example: A possible appearance of the code's return value from `add_task` could be an integer representing the newly assigned task ID, e.g., 5. The `get_next_task` method might return a tuple like `(Task(task_id=3, dependencies=[], extra_info=None), 3)` if Task with ID 3 is next in line for processing. If no tasks are available, it returns `(None, -1)`.
 ### FunctionDef __init__(self)
-**__init__**: The function of __init__ is to initialize a MultiTaskDispatch object.
+**__init__**: Initializes a MultiTaskDispatch object.
 
-**parameters**: The __init__ function does not take any parameters.
+parameters:
+· None: The __init__ method does not take any parameters.
 
-**Code Description**: The __init__ method is responsible for setting up a new instance of the MultiTaskDispatch class. It initializes several key attributes that are essential for managing multiple tasks within a multi-tasking framework. 
+Code Description: The __init__ method is responsible for setting up a new instance of the MultiTaskDispatch class by initializing several key attributes. These attributes are crucial for managing multiple tasks within the system:
 
-- `task_dict`: This attribute is a dictionary that maps integer task IDs to Task objects. It serves as a central repository for all tasks being managed, allowing for efficient retrieval and management of tasks based on their unique identifiers.
+- task_dict (Dict[int, Task]): This dictionary maps unique integer identifiers to Task objects. It serves as a central repository for all tasks managed by this instance of MultiTaskDispatch.
+  
+- task_lock (threading.Lock): A threading lock object used to synchronize access to the task_dict. This ensures that modifications to the task dictionary are thread-safe, preventing race conditions in multi-threaded environments.
 
-- `task_lock`: This attribute is an instance of `threading.Lock`, which is utilized for thread synchronization. It ensures that access to the `task_dict` is thread-safe, preventing race conditions that could occur when multiple threads attempt to modify or access the task dictionary simultaneously.
+- now_id (int): An integer representing the current task ID. It is incremented each time a new task is added to the system, ensuring that each task has a unique identifier.
+  
+- query_id (int): Another integer used for tracking queries or operations within the system. Similar to now_id, it increments with each new operation.
 
-- `now_id`: This integer attribute keeps track of the current task ID being processed. It is initialized to zero, indicating that no tasks have been processed yet.
+The method initializes these attributes with default values: an empty dictionary for task_dict, a newly created threading lock for task_lock, and 0 for both now_id and query_id.
 
-- `query_id`: Similar to `now_id`, this integer attribute is used to track the current query ID. It is also initialized to zero.
-
-- `sync_func`: This attribute is initialized to None and serves as a placeholder for a synchronization function that may be defined later. This allows for flexibility in managing task synchronization as needed.
-
-The initialization of these attributes is crucial for the proper functioning of the MultiTaskDispatch system, as they lay the groundwork for task management and synchronization. The MultiTaskDispatch class relies on the Task class to represent individual tasks, which are stored in `task_dict`. The relationship between MultiTaskDispatch and Task is fundamental, as MultiTaskDispatch orchestrates the execution and management of these Task objects, ensuring that tasks are executed in accordance with their dependencies and statuses.
-
-**Note**: When using the MultiTaskDispatch class, it is important to ensure that the task management system is properly configured, particularly with respect to thread safety and the handling of task dependencies. Proper initialization of the attributes is essential for the smooth operation of the task management framework.
+Note: Developers should be aware that while task_dict is initialized as an empty dictionary, tasks need to be added separately using appropriate methods provided by the MultiTaskDispatch class. The task_lock ensures that these operations are safe in concurrent scenarios. The now_id and query_id attributes provide a simple mechanism for tracking and managing unique identifiers within the system.
 ***
 ### FunctionDef all_success(self)
-**all_success**: all_success的功能是检查任务管理器中的任务字典是否为空。
+**all_success**: This function checks if all tasks have been successfully completed by verifying if there are no remaining tasks in the task dictionary.
+parameters:
+· None: The function does not accept any parameters.
 
-**parameters**: 此函数没有参数。
+Code Description: The function `all_success` is a method of the `TaskManager` class. It returns a boolean value indicating whether all tasks have been successfully completed. This is determined by checking if the length of the `task_dict`, which presumably holds information about pending or ongoing tasks, is zero. If there are no items in this dictionary, it means that all tasks have been processed and removed from the queue, hence returning `True`. Otherwise, it returns `False`.
 
-**Code Description**: all_success函数用于判断任务管理器中的任务字典（task_dict）是否为空。具体来说，它通过计算任务字典的长度来实现这一点。如果任务字典的长度为零，表示没有待处理的任务，函数将返回True；否则，返回False。
+Note: This function is used to determine if the task queue is empty, which can be useful for logging, halting further processing, or initiating a new round of task generation. In the provided context, it is used in the `Runner` class's `run` method to check if all documents are up-to-date and no tasks remain in the queue before proceeding with other operations.
 
-在项目中，all_success函数被调用于repo_agent/runner.py中的Runner类的run方法。在run方法中，任务管理器的状态被检查，以确定是否所有文档生成任务都已完成。如果all_success返回True，表示任务队列中没有任务，所有文档都已完成且是最新的，这时会记录一条日志，表明没有任务在队列中。
-
-**Note**: 使用此函数时，请确保任务字典的状态已正确更新，以避免误判任务是否完成。
-
-**Output Example**: 假设任务字典为空，调用all_success将返回True。
+Output Example: If there are no tasks left in the task dictionary, `all_success` will return `True`. For instance:
+```
+task_manager = TaskManager()
+# Assume all tasks have been completed and removed from task_dict
+print(task_manager.all_success)  # Output: True
+```
 ***
 ### FunctionDef add_task(self, dependency_task_id, extra)
-**add_task**: The function of add_task is to add a new task to the task dictionary while managing its dependencies.
+**add_task**: Adds a new task to the task dictionary within a multi-task dispatch system.
 
-**parameters**: The parameters of this Function.
-· dependency_task_id: List[int] - A list of task IDs that the new task depends on.
-· extra: Any, optional - Extra information associated with the task. Defaults to None.
+parameters:
+· dependency_task_id: A list of integers representing the IDs of tasks that the new task depends on before it can be executed.
+· extra: Optional parameter for any additional information associated with the task. Defaults to None if not provided.
 
-**Code Description**: The add_task method is responsible for creating and adding a new task to the task manager's internal dictionary of tasks. It takes a list of dependency task IDs, which represent other tasks that must be completed before the new task can start. The method also accepts an optional parameter, extra, which can hold any additional information related to the task.
+Code Description: The function add_task is designed to integrate a new task into an existing system's task management framework. It accepts two parameters: dependency_task_id, which is a list of integers representing the IDs of tasks that must be completed before the newly added task can begin; and extra, which allows for any additional data to be associated with the task (default is None). The function first acquires a lock on the task dictionary to ensure thread safety during the addition of the new task. It then retrieves the Task objects corresponding to the provided dependency_task_id from the task dictionary. A new Task object is instantiated with the current now_id as its task_id, the list of dependencies, and the extra information. This new task is added to the task dictionary with its ID as the key. The now_id is incremented by one to ensure that each subsequent task receives a unique identifier. Finally, the function returns the ID of the newly added task.
 
-When the add_task method is invoked, it first acquires a lock (self.task_lock) to ensure thread safety while modifying the task dictionary. It then retrieves the Task objects corresponding to the provided dependency_task_id list. These Task objects are stored in the depend_tasks list. 
+Note: Developers should provide valid task IDs in the dependency_task_id list that correspond to tasks already present in the system. The extra parameter can be used to store any relevant information about the task, which might be useful for tracking or debugging purposes. This function is typically called by higher-level components, such as a MetaInfo class method, when setting up and managing task dependencies within a multi-task dispatch system.
 
-Next, a new Task object is instantiated using the current task ID (self.now_id), the list of dependencies (depend_tasks), and the optional extra information. This new Task object is then added to the task dictionary with the current task ID as the key. After successfully adding the task, the method increments the now_id counter to ensure that the next task added will have a unique identifier. Finally, the method returns the ID of the newly added task.
-
-The add_task method is called within the get_task_manager method of the MetaInfo class. In this context, get_task_manager is responsible for constructing a TaskManager instance and populating it with tasks based on the relationships between various document items. As it processes each document item, it determines the dependencies for the task to be created and invokes add_task to register the new task in the TaskManager. This integration highlights the role of add_task in establishing the task management framework, ensuring that tasks are created with the correct dependencies and are properly tracked within the system.
-
-**Note**: When using the add_task method, it is essential to ensure that the dependency_task_id list does not contain circular references, as this could lead to issues in task execution. Additionally, the extra parameter should be used judiciously to provide relevant context for the task without introducing unnecessary complexity.
-
-**Output Example**: A possible return value of the add_task method could be an integer representing the ID of the newly added task, such as 5, indicating that the task has been successfully added to the task manager with that identifier.
+Output Example: If the current now_id is 5 and there are no tasks with IDs 1 and 3 in the dependency_task_id list, calling add_task([1, 3], "Task to process data") will create a new Task object with task_id = 5, dependencies = [task_object_with_id_1, task_object_with_id_3], extra_info = "Task to process data", and status = 0. The function will then return the integer 5, representing the ID of the newly added task.
 ***
 ### FunctionDef get_next_task(self, process_id)
-**get_next_task**: get_next_task的功能是为给定的进程ID获取下一个任务。
+**get_next_task**: Retrieves the next task available for a specific process based on its ID. The function checks tasks to see if they are ready (i.e., have no dependencies and are not yet assigned) and returns the first such task it finds.
 
-**parameters**: 该函数的参数。
-· parameter1: process_id (int) - 进程的ID。
+parameters:
+· process_id: An integer representing the unique identifier of the process requesting the next task.
 
-**Code Description**: 
-get_next_task函数用于根据提供的进程ID获取下一个可用的任务。函数首先通过self.task_lock锁定任务，以确保在多线程环境中对任务的安全访问。接着，query_id自增1，用于跟踪查询次数。函数遍历task_dict字典中的所有任务ID，检查每个任务的依赖关系和状态。只有当任务的依赖关系为空且状态为0（表示任务可用）时，才将其标记为已获取（状态设置为1）。在获取任务时，函数会打印出当前进程ID、获取的任务ID以及剩余任务的数量。如果query_id是10的倍数，则调用sync_func函数进行同步。最后，函数返回获取的任务对象及其ID。如果没有可用的任务，函数将返回(None, -1)。
+Code Description: The function starts by acquiring a lock (`self.task_lock`) to ensure thread safety when accessing shared resources. It then increments an internal query ID (`self.query_id`), which may be used for tracking or logging purposes. The function iterates over all tasks stored in `self.task_dict`, checking each task's dependencies and status. A task is considered ready if it has no dependencies (`len(self.task_dict[task_id].dependencies) == 0`) and its status is 0 (indicating that the task has not been assigned yet). If a ready task is found, its status is updated to 1 to mark it as assigned, and the function logs this assignment with a message indicating the process ID, the task ID, and the number of remaining tasks. The function then returns the ready task object along with its ID. If no ready tasks are found after checking all entries in `self.task_dict`, the function returns `(None, -1)` to indicate that there are no available tasks.
 
-**Note**: 使用该函数时，请确保在调用前已正确初始化task_dict，并且在多线程环境中使用task_lock来避免竞争条件。
+Note: This function is designed to be used in a multi-threaded environment where multiple processes may request tasks concurrently. The use of a lock (`self.task_lock`) ensures that only one process can modify or check task statuses at a time, preventing race conditions and ensuring data integrity.
 
-**Output Example**: 
-假设有一个可用的任务，其ID为5，返回值可能为：
-(task_object, 5)  # 其中task_object是获取的任务对象。 
-
-如果没有可用的任务，返回值将为：
-(None, -1)
+Output Example: If the function finds a ready task with ID 42 for a process with ID 101, it might log "process 101: get task(42), remain(5)" and return `(task_object_42, 42)`. If no tasks are available, it would return `(None, -1)`.
 ***
 ### FunctionDef mark_completed(self, task_id)
-**mark_completed**: mark_completed的功能是将指定任务标记为已完成，并从任务字典中移除该任务。
+**mark_completed**: This function marks a specified task as completed by removing it from the internal task dictionary and updating the dependencies of other tasks accordingly.
 
-**parameters**: 该函数的参数。
-· parameter1: task_id (int) - 要标记为已完成的任务的ID。
+parameters:
+· task_id: An integer representing the unique identifier of the task that needs to be marked as completed.
 
-**Code Description**: mark_completed函数用于将指定的任务标记为已完成，并从任务管理器的任务字典中删除该任务。函数接收一个整数类型的参数task_id，表示要处理的任务的唯一标识符。函数内部首先通过自我锁定（self.task_lock）来确保在多线程环境下对任务字典的安全访问。接着，函数通过task_id从任务字典中获取目标任务（target_task）。然后，函数遍历任务字典中的所有任务，检查目标任务是否在其他任务的依赖列表中。如果目标任务存在于其他任务的依赖中，则将其从依赖列表中移除。最后，函数调用pop方法从任务字典中删除该任务，确保任务不再被管理。
+Code Description: The function begins by acquiring a lock (self.task_lock) to ensure thread safety, which is crucial in multi-threaded environments. It then retrieves the target task from the task dictionary using the provided task_id. Following this, it iterates over all tasks stored in the task dictionary. For each task, it checks if the target task is listed among its dependencies. If so, the target task is removed from that list of dependencies. This step ensures that no other task incorrectly references a completed task as a dependency. Finally, the function removes the target task entirely from the task dictionary, marking it as completed and cleaning up any lingering references to it.
 
-**Note**: 使用该函数时，请确保传入的task_id是有效的，并且对应的任务在任务字典中存在。调用此函数后，相关依赖关系也会被更新，因此在调用之前应考虑任务之间的依赖关系。
+Note: Usage points include ensuring that the provided task_id corresponds to an existing task in the task dictionary to avoid runtime errors. Additionally, developers should be aware of the thread safety mechanism implemented by the lock, which is essential when the TaskManager is accessed from multiple threads simultaneously.
 ***
 ## FunctionDef worker(task_manager, process_id, handler)
-**worker**: worker函数用于执行由任务管理器分配的任务。
+**worker**: Worker function that performs tasks assigned by the task manager. It continuously fetches tasks from the task manager, processes them using a specified handler function, and marks them as completed once processed.
 
-**parameters**: 该函数的参数如下：
-· parameter1: task_manager - 任务管理器对象，用于分配任务给工作线程。
-· parameter2: process_id (int) - 当前工作进程的ID。
-· parameter3: handler (Callable) - 处理任务的函数。
+**parameters**:
+· task_manager: The task manager object responsible for assigning tasks to workers.
+· process_id (int): An integer representing the ID of the current worker process.
+· handler (Callable): A callable function that handles the specific tasks assigned by the task manager.
 
-**Code Description**: worker函数是一个无限循环的工作线程，它从任务管理器中获取任务并执行。首先，它会检查任务管理器的状态，如果所有任务都已成功完成，则函数返回，结束执行。接着，worker调用task_manager的get_next_task方法，获取当前进程ID对应的下一个任务及其ID。如果没有可用的任务，worker会暂停0.5秒后继续循环。
+**Code Description**: The `worker` function operates in an infinite loop until all tasks are successfully completed, as indicated by the `task_manager.all_success` flag. Within each iteration, it checks if there are any pending tasks for the current worker process by calling `task_manager.get_next_task(process_id)`. If no task is available (`task` is None), the function pauses briefly (sleeps for 0.5 seconds) before checking again. When a task becomes available, it invokes the provided handler function with additional information from the task (`task.extra_info`). After handling the task, it informs the task manager that the task has been completed by calling `task_manager.mark_completed(task.task_id)`.
 
-一旦获取到任务，worker会调用传入的handler函数，处理任务的额外信息。处理完成后，worker会调用task_manager的mark_completed方法，标记该任务为已完成。此函数的设计允许多个worker并行处理任务，提升了任务执行的效率。
+**Note**: This function is designed to be run in a multithreaded environment where multiple worker instances can operate concurrently. Each worker instance should have a unique process ID and share the same task manager object to ensure tasks are distributed efficiently across all workers.
 
-在项目中，worker函数被repo_agent/runner.py中的first_generate和run方法调用。具体来说，这两个方法在生成文档的过程中会创建多个线程，每个线程都运行worker函数，以并行处理任务。first_generate方法负责初始化任务列表并启动worker线程，而run方法则在检测到文件变更时重新生成文档，并同样启动worker线程来处理任务。
-
-**Note**: 使用该函数时，需要确保任务管理器的状态正确，以避免在没有任务可执行时造成不必要的等待。
-
-**Output Example**: 假设任务管理器分配了一个任务，worker函数在处理后可能会返回如下信息：
-```
-任务ID: 12345 已成功完成。
-```
+**Output Example**: The `worker` function does not return any value explicitly (returns None). Its primary output is the side effect of processing tasks through the handler function, which may involve generating or updating documentation files as part of a larger document generation process.
 ## FunctionDef some_function
-**some_function**: some_function的功能是随机暂停一段时间。
+**some_function**: This function causes the program to pause for a random duration between 0 and 3 seconds.
 
-**parameters**: 该函数没有参数。
+parameters:
+· None: This function does not take any parameters.
 
-**Code Description**: some_function是一个简单的函数，其主要功能是使程序随机暂停一段时间。具体实现上，函数内部调用了time.sleep()方法，传入的参数是一个随机生成的浮点数，该浮点数的范围是0到3秒之间。这个随机数是通过random.random()生成的，random.random()返回一个在[0.0, 1.0)范围内的随机浮点数，因此乘以3后，最终的暂停时间会在0到3秒之间变化。这种随机暂停的功能可以用于需要模拟延迟或等待的场景，例如在多线程或异步编程中，可能需要随机延迟以避免资源竞争或模拟真实用户的操作行为。
+Code Description: The function `some_function` utilizes Python's built-in `time.sleep()` method to pause the execution of the program. The duration of this pause is determined by multiplying a random float number (between 0.0 and 1.0) generated by `random.random()` with 3, resulting in a sleep time that can vary between 0 and 3 seconds inclusively. This behavior introduces an element of unpredictability into the timing of subsequent operations within the program.
 
-**Note**: 使用该函数时，请注意它会导致程序暂停，因此在需要高性能或实时响应的场景中应谨慎使用。此外，由于暂停时间是随机的，可能会影响程序的可预测性。
+Note: Usage points include scenarios where you might want to simulate delays or mimic real-world conditions that involve variability in timing, such as network response times or user interactions. Ensure that the `time` and `random` modules are imported before using this function.
