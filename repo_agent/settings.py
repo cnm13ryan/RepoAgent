@@ -1,6 +1,3 @@
-from enum import StrEnum
-from typing import Optional
-
 from iso639 import Language, LanguageNotFoundError
 from pydantic import (
     DirectoryPath,
@@ -12,8 +9,6 @@ from pydantic import (
     field_validator,
 )
 from pydantic_settings import BaseSettings
-from pathlib import Path
-
 
 class LogLevel(StrEnum):
     DEBUG = "DEBUG"
