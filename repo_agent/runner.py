@@ -24,11 +24,16 @@ from repo_agent.utils.meta_info_utils import delete_fake_files, make_fake_files
 
 class Runner:
     def __init__(self):
+        """
+        Initialize the Runner with settings, the project manager, and
+        the meta_info structure that tracks documentation state.
+        """
         self.setting = SettingsManager.get_setting()
         self.absolute_project_hierarchy_path = (
             self.setting.project.target_repo / self.setting.project.hierarchy_name
         )
 
+        # Core helpers
         self.project_manager = ProjectManager(
             repo_path=self.setting.project.target_repo,
             project_hierarchy=self.setting.project.hierarchy_name,
@@ -38,55 +43,184 @@ class Runner:
         )
         self.chat_engine = ChatEngine(project_manager=self.project_manager)
 
-        if not self.absolute_project_hierarchy_path.exists():
+        # Load or create meta_info
+        if self.absolute_project_hierarchy_path.exists():
+            self.meta_info = MetaInfo.from_checkpoint_path(self.absolute_project_hierarchy_path)
+        else:
             file_path_reflections, jump_files = make_fake_files()
             self.meta_info = MetaInfo.init_meta_info(file_path_reflections, jump_files)
+
+        # Always checkpoint after loading or creating meta_info
+        self.meta_info.checkpoint(target_dir_path=self.absolute_project_hierarchy_path)
+
+        self.runner_lock = threading.Lock()
+
+
+    def run(self):
+        """
+        Main entry point: updates or generates documentation based on
+        whether a documented version exists. Includes incremental changes
+        or first-time generation paths.
+        """
+        # Guard clause: if brand-new doc state, do a first-time generation
+        if self.meta_info.document_version == "":
+            self.first_generate()
+            self.meta_info.checkpoint(
+                target_dir_path=self.absolute_project_hierarchy_path,
+                flash_reference_relation=True,
+            )
+            return
+
+        # If not in generation process, detect changes and set up tasks
+        if not self.meta_info.in_generation_process:
+            logger.info("Starting to detect changes.")
+
+            file_path_reflections, jump_files = make_fake_files()
+            new_meta_info = MetaInfo.init_meta_info(file_path_reflections, jump_files)
+            new_meta_info.load_doc_from_older_meta(self.meta_info)
+
+            self.meta_info = new_meta_info
+            self.meta_info.in_generation_process = True
+
+        # Build the task_manager from meta_info
+        check_task_available_func = partial(
+            need_to_generate, ignore_list=self.setting.project.ignore_list
+        )
+        task_manager = self.meta_info.get_task_manager(
+            self.meta_info.target_repo_hierarchical_tree,
+            task_available_func=check_task_available_func,
+        )
+
+        # Log deleted items detected
+        for item_name, item_type in self.meta_info.deleted_items_from_older_meta:
+            print(
+                f"{Fore.LIGHTMAGENTA_EX}[Dir/File/Obj Delete Detected]: {Style.RESET_ALL} {item_type} {item_name}"
+            )
+
+        # Print tasks that need doc generation
+        self.meta_info.print_task_list(task_manager.task_dict)
+
+        if task_manager.all_success:
+            logger.info("No tasks in the queue, all documents are completed and up to date.")
+
+        # Spawn worker threads
+        threads = [
+            threading.Thread(
+                target=worker,
+                args=(task_manager, process_id, self.generate_doc_for_a_single_item),
+            )
+            for process_id in range(self.setting.project.max_thread_count)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        # Wrap up once tasks are done
+        self.meta_info.in_generation_process = False
+        self.meta_info.document_version = self.change_detector.repo.head.commit.hexsha
+
+        self.meta_info.checkpoint(
+            target_dir_path=self.absolute_project_hierarchy_path,
+            flash_reference_relation=True,
+        )
+        logger.info("Doc has been forwarded to the latest version.")
+
+        self.markdown_refresh()
+        delete_fake_files()
+
+        logger.info("Starting to git-add DocMetaInfo and newly generated Docs")
+        time.sleep(1)
+
+        # Stage new or changed doc files
+        git_add_result = self.change_detector.add_unstaged_files()
+        if git_add_result:
+            logger.info(f"Added {[file for file in git_add_result]} to the staging area.")
+
+        # Optionally: self.git_commit("Your commit message")
+
+
+    def first_generate(self):
+        """
+        Perform a one-time generation pass for all documentation,
+        then refresh and store the resulting doc info.
+        """
+        logger.info("Starting to generate documentation")
+
+        check_task_available_func = partial(
+            need_to_generate, ignore_list=self.setting.project.ignore_list
+        )
+        task_manager = self.meta_info.get_topology(check_task_available_func)
+        before_task_len = len(task_manager.task_dict)
+
+        # Either initialize a new task list or continue an existing one
+        if not self.meta_info.in_generation_process:
+            self.meta_info.in_generation_process = True
+            logger.info("Init a new task-list")
+        else:
+            logger.info("Load from an existing task-list")
+
+        self.meta_info.print_task_list(task_manager.task_dict)
+
+        try:
+            # Spawn threads for doc generation
+            threads = [
+                threading.Thread(
+                    target=worker,
+                    args=(task_manager, process_id, self.generate_doc_for_a_single_item),
+                )
+                for process_id in range(self.setting.project.max_thread_count)
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+            # Refresh markdown
+            self.markdown_refresh()
+
+            # Set doc version and checkpoint
+            self.meta_info.document_version = self.change_detector.repo.head.commit.hexsha
+            self.meta_info.in_generation_process = False
+
             self.meta_info.checkpoint(
                 target_dir_path=self.absolute_project_hierarchy_path
             )
-        else:  # 如果存在全局结构信息文件夹.project_hierarchy，就从中加载
-            self.meta_info = MetaInfo.from_checkpoint_path(
-                self.absolute_project_hierarchy_path
+
+            logger.info(
+                f"Successfully generated {before_task_len - len(task_manager.task_dict)} documents."
             )
 
-        self.meta_info.checkpoint(  # 更新白名单后也要重新将全局信息写入到.project_doc_record文件夹中
-            target_dir_path=self.absolute_project_hierarchy_path
-        )
-        self.runner_lock = threading.Lock()
+        except BaseException as e:
+            logger.error(
+                f"An error occurred: {e}. "
+                f"{before_task_len - len(task_manager.task_dict)} docs are generated at this time"
+            )
 
-    def get_all_pys(self, directory):
-        """
-        Get all Python files in the given directory.
-
-        Args:
-            directory (str): The directory to search.
-
-        Returns:
-            list: A list of paths to all Python files.
-        """
-        python_files = []
-
-        for root, dirs, files in os.walk(directory):
-            for file in files:
-                if file.endswith(".py"):
-                    python_files.append(os.path.join(root, file))
-
-        return python_files
 
     def generate_doc_for_a_single_item(self, doc_item: DocItem):
-        """为一个对象生成文档"""
+        """
+        Generate or update the documentation for a single item (function, class, etc.)
+        using ChatEngine.
+        """
         try:
+            # Flattened guard clause for ignoring or skipping generation
             if not need_to_generate(doc_item, self.setting.project.ignore_list):
-                print(f"Content ignored/Document generated, skipping: {doc_item.get_full_name()}")
-                return  # <-- Guard clause: end early
+                print(
+                    f"Content ignored/Document generated, skipping: {doc_item.get_full_name()}"
+                )
+                return
 
             # Otherwise, proceed with doc generation
             print(
-                f" -- Generating document  {Fore.LIGHTYELLOW_EX}{doc_item.item_type.name}: {doc_item.get_full_name()}{Style.RESET_ALL}"
+                f" -- Generating document  "
+                f"{Fore.LIGHTYELLOW_EX}{doc_item.item_type.name}: {doc_item.get_full_name()}"
+                f"{Style.RESET_ALL}"
             )
             response_message = self.chat_engine.generate_doc(doc_item=doc_item)
             doc_item.md_content.append(response_message)  # type: ignore
             doc_item.item_status = DocItemStatus.doc_up_to_date
+
             self.meta_info.checkpoint(
                 target_dir_path=self.absolute_project_hierarchy_path
             )
@@ -97,84 +231,32 @@ class Runner:
             )
             doc_item.item_status = DocItemStatus.doc_has_not_been_generated
 
-    def first_generate(self):
-        """
-        生成所有文档，完成后刷新并保存文件系统中的文档信息。
-        """
-        logger.info("Starting to generate documentation")
-        check_task_available_func = partial(
-            need_to_generate, ignore_list=self.setting.project.ignore_list
-        )
-        task_manager = self.meta_info.get_topology(check_task_available_func)
-        before_task_len = len(task_manager.task_dict)
-
-        if not self.meta_info.in_generation_process:
-            self.meta_info.in_generation_process = True
-            logger.info("Init a new task-list")
-        else:
-            logger.info("Load from an existing task-list")
-        self.meta_info.print_task_list(task_manager.task_dict)
-
-        try:
-            # 创建并启动线程
-            threads = [
-                threading.Thread(
-                    target=worker,
-                    args=(
-                        task_manager,
-                        process_id,
-                        self.generate_doc_for_a_single_item,
-                    ),
-                )
-                for process_id in range(self.setting.project.max_thread_count)
-            ]
-            for thread in threads:
-                thread.start()
-            for thread in threads:
-                thread.join()
-
-            # 所有任务完成后刷新文档
-            self.markdown_refresh()
-
-            # 更新文档版本
-            self.meta_info.document_version = (
-                self.change_detector.repo.head.commit.hexsha
-            )
-            self.meta_info.in_generation_process = False
-            self.meta_info.checkpoint(
-                target_dir_path=self.absolute_project_hierarchy_path
-            )
-            logger.info(
-                f"Successfully generated {before_task_len - len(task_manager.task_dict)} documents."
-            )
-
-        except BaseException as e:
-            logger.error(
-                f"An error occurred: {e}. {before_task_len - len(task_manager.task_dict)} docs are generated at this time"
-            )
 
     def markdown_refresh(self):
-        """刷新最新的文档信息到markdown格式文件夹中"""
+        """
+        Rebuild the entire Markdown folder from in-memory doc items.
+        Deletes the old folder, recreates it, and writes out .md files for each file's children.
+        """
         with self.runner_lock:
-            # 定义 markdown 文件夹路径
             markdown_folder = (
                 Path(self.setting.project.target_repo)
                 / self.setting.project.markdown_docs_name
             )
 
-            # 删除并重新创建目录
+            # Delete old docs if present
             if markdown_folder.exists():
                 logger.debug(f"Deleting existing contents of {markdown_folder}")
                 shutil.rmtree(markdown_folder)
+
+            # Recreate folder
             markdown_folder.mkdir(parents=True, exist_ok=True)
             logger.debug(f"Created markdown folder at {markdown_folder}")
 
-        # 遍历文件列表生成 markdown
         file_item_list = self.meta_info.get_all_files()
         logger.debug(f"Found {len(file_item_list)} files to process.")
 
         for file_item in tqdm(file_item_list):
-            # 检查文档内容
+            # Helper to see if this item has any doc content
             def recursive_check(doc_item) -> bool:
                 if doc_item.md_content:
                     return True
@@ -189,7 +271,7 @@ class Runner:
                 )
                 continue
 
-            # 生成 markdown 内容
+            # Build markdown by recursing children
             markdown = ""
             for child in file_item.children.values():
                 markdown += self.to_markdown(child, 2)
@@ -200,20 +282,17 @@ class Runner:
                 )
                 continue
 
-            # 确定并创建文件路径
-            file_path = Path(
-                self.setting.project.markdown_docs_name
-            ) / file_item.get_file_name().replace(".py", ".md")
+            # Determine output path
+            file_path = Path(self.setting.project.markdown_docs_name) / file_item.get_file_name().replace(".py", ".md")
             abs_file_path = self.setting.project.target_repo / file_path
             logger.debug(f"Writing markdown to: {abs_file_path}")
 
-            # 确保目录存在
             abs_file_path.parent.mkdir(parents=True, exist_ok=True)
             logger.debug(f"Ensured directory exists: {abs_file_path.parent}")
 
-            # 使用锁保护文件写入操作
+            # Attempt file writing, with lock and retries
             with self.runner_lock:
-                for attempt in range(3):  # 最多重试3次
+                for attempt in range(3):
                     try:
                         with open(abs_file_path, "w", encoding="utf-8") as file:
                             file.write(markdown)
@@ -223,165 +302,68 @@ class Runner:
                         logger.error(
                             f"Failed to write {abs_file_path} on attempt {attempt + 1}: {e}"
                         )
-                        time.sleep(1)  # 延迟再试
+                        time.sleep(1)
 
         logger.info(
             f"Markdown documents have been refreshed at {self.setting.project.markdown_docs_name}"
         )
 
+
     def to_markdown(self, item, now_level: int) -> str:
-        """将文件内容转化为 markdown 格式的文本"""
-        markdown_content = (
-            "#" * now_level + f" {item.item_type.to_str()} {item.obj_name}"
-        )
+        """
+        Recursively convert a doc item into Markdown content,
+        including heading levels, parameters, and child items.
+        """
+        markdown_content = "#" * now_level + f" {item.item_type.to_str()} {item.obj_name}"
+
         if "params" in item.content.keys() and item.content["params"]:
             markdown_content += f"({', '.join(item.content['params'])})"
         markdown_content += "\n"
+
+        # Use the latest doc content, or placeholder text if none exists
         if item.md_content:
             markdown_content += f"{item.md_content[-1]}\n"
         else:
             markdown_content += "Doc is waiting to be generated...\n"
+
+        # Recurse into children
         for child in item.children.values():
             markdown_content += self.to_markdown(child, now_level + 1)
             markdown_content += "***\n"
+
         return markdown_content
 
-    def git_commit(self, commit_message):
-        try:
-            subprocess.check_call(
-                ["git", "commit", "--no-verify", "-m", commit_message],
-                shell=True,
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"An error occurred while trying to commit {str(e)}")
-
-    def run(self):
-        """
-        Runs the document update process.
-
-        This method detects the changed Python files, processes each file, and updates the documents accordingly.
-
-        Returns:
-            None
-        """
-
-        # Guard for brand-new doc state
-        if self.meta_info.document_version == "":
-            self.first_generate()
-            self.meta_info.checkpoint(
-                target_dir_path=self.absolute_project_hierarchy_path,
-                flash_reference_relation=True,
-            )
-            return  # <-- Early return if first-time generation
-
-        # If not in generation process, detect changes
-        if not self.meta_info.in_generation_process:
-            logger.info("Starting to detect changes.")
-            file_path_reflections, jump_files = make_fake_files()
-            new_meta_info = MetaInfo.init_meta_info(file_path_reflections, jump_files)
-            new_meta_info.load_doc_from_older_meta(self.meta_info)
-            self.meta_info = new_meta_info
-            self.meta_info.in_generation_process = True
-
-        # 处理任务队列
-        check_task_available_func = partial(
-            need_to_generate, ignore_list=self.setting.project.ignore_list
-        )
-
-        task_manager = self.meta_info.get_task_manager(
-            self.meta_info.target_repo_hierarchical_tree,
-            task_available_func=check_task_available_func,
-        )
-
-        for item_name, item_type in self.meta_info.deleted_items_from_older_meta:
-            print(
-                f"{Fore.LIGHTMAGENTA_EX}[Dir/File/Obj Delete Dected]: {Style.RESET_ALL} {item_type} {item_name}"
-            )
-        self.meta_info.print_task_list(task_manager.task_dict)
-        if task_manager.all_success:
-            logger.info(
-                "No tasks in the queue, all documents are completed and up to date."
-            )
-
-        threads = [
-            threading.Thread(
-                target=worker,
-                args=(task_manager, process_id, self.generate_doc_for_a_single_item),
-            )
-            for process_id in range(self.setting.project.max_thread_count)
-        ]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-
-        self.meta_info.in_generation_process = False
-        self.meta_info.document_version = self.change_detector.repo.head.commit.hexsha
-
-        self.meta_info.checkpoint(
-            target_dir_path=self.absolute_project_hierarchy_path,
-            flash_reference_relation=True,
-        )
-        logger.info(f"Doc has been forwarded to the latest version")
-
-        self.markdown_refresh()
-        delete_fake_files()
-
-        logger.info(f"Starting to git-add DocMetaInfo and newly generated Docs")
-        time.sleep(1)
-
-        # 将run过程中更新的Markdown文件（未暂存）添加到暂存区
-        git_add_result = self.change_detector.add_unstaged_files()
-
-        if len(git_add_result) > 0:
-            logger.info(
-                f"Added {[file for file in git_add_result]} to the staging area."
-            )
-
-        # self.git_commit(f"Update documentation for {file_handler.file_path}") # 提交变更
 
     def add_new_item(self, file_handler, json_data):
         """
-        Add new projects to the JSON file and generate corresponding documentation.
-
-        Args:
-            file_handler (FileHandler): The file handler object for reading and writing files.
-            json_data (dict): The JSON data storing the project structure information.
-
-        Returns:
-            None
+        For a new file, record all discovered objects, generate docs, and
+        write them to JSON and Markdown files.
         """
         file_dict = {}
-        # 因为是新增的项目，所以这个文件里的所有对象都要写一个文档
-        for (
-            structure_type,
-            name,
-            start_line,
-            end_line,
-            parent,
-            params,
-        ) in file_handler.get_functions_and_classes(file_handler.read_file()):
+        source_code = file_handler.read_file()
+
+        # Discover objects and generate docs
+        for (structure_type, name, start_line, end_line, parent, params) in file_handler.get_functions_and_classes(source_code):
             code_info = file_handler.get_obj_code_info(
                 structure_type, name, start_line, end_line, parent, params
             )
             response_message = self.chat_engine.generate_doc(code_info, file_handler)
-            md_content = response_message.content
-            code_info["md_content"] = md_content
-            # 文件对象file_dict中添加一个新的对象
+            code_info["md_content"] = response_message.content
+
             file_dict[name] = code_info
 
         json_data[file_handler.file_path] = file_dict
-        # 将新的项写入json文件
+
+        # Write updated JSON
         with open(self.project_manager.project_hierarchy, "w", encoding="utf-8") as f:
             json.dump(json_data, f, indent=4, ensure_ascii=False)
         logger.info(
-            f"The structural information of the newly added file {file_handler.file_path} has been written into a JSON file."
+            f"The structural information of newly added file {file_handler.file_path} "
+            f"has been written into a JSON file."
         )
-        # 将变更部分的json文件内容转换成markdown内容
-        markdown = file_handler.convert_to_markdown_file(
-            file_path=file_handler.file_path
-        )
-        # 将markdown内容写入.md文件
+
+        # Convert to markdown
+        markdown = file_handler.convert_to_markdown_file(file_handler.file_path)
         file_handler.write_file(
             os.path.join(
                 self.project_manager.repo_path,
@@ -390,20 +372,13 @@ class Runner:
             ),
             markdown,
         )
-        logger.info(f"已生成新增文件 {file_handler.file_path} 的Markdown文档。")
+        logger.info(f"Generated Markdown doc for new file {file_handler.file_path}.")
+
 
     def process_file_changes(self, repo_path, file_path, is_new_file):
         """
-        This function is called in the loop of detected changed files. Its purpose is to process changed files according to the absolute file path, including new files and existing files.
-        Among them, changes_in_pyfile is a dictionary that contains information about the changed structures. An example format is: {'added': {'add_context_stack', '__init__'}, 'removed': set()}
-
-        Args:
-            repo_path (str): The path to the repository.
-            file_path (str): The relative path to the file.
-            is_new_file (bool): Indicates whether the file is new or not.
-
-        Returns:
-            None
+        Called in a loop for each changed file; updates or adds docs for
+        changed objects in that file.
         """
         file_handler = FileHandler(repo_path=repo_path, file_path=file_path)
         source_code = file_handler.read_file()
@@ -416,27 +391,32 @@ class Runner:
         )
         logger.info(f"Detected changed objects:\n{changes_in_pyfile}")
 
+        # Load JSON data
         with open(self.project_manager.project_hierarchy, "r", encoding="utf-8") as f:
             json_data = json.load(f)
 
-        # Guard clause: If file does NOT exist in JSON, add & return
+        # Guard clause: if file not in JSON, it's a new item
         if file_handler.file_path not in json_data:
             self.add_new_item(file_handler, json_data)
-            git_add_result = self.change_detector.add_unstaged_files()
-            if len(git_add_result) > 0:
-                logger.info(f"Added {[file for file in git_add_result]} to staging.")
-            return  # <-- Flatten: early exit
 
-        # Otherwise, update existing item
+            git_add_result = self.change_detector.add_unstaged_files()
+            if git_add_result:
+                logger.info(f"Added {[file for file in git_add_result]} to staging.")
+            return
+
+        # Otherwise, update existing info
         json_data[file_handler.file_path] = self.update_existing_item(
-            json_data[file_handler.file_path], file_handler, changes_in_pyfile
+            json_data[file_handler.file_path],
+            file_handler,
+            changes_in_pyfile
         )
 
+        # Write JSON
         with open(self.project_manager.project_hierarchy, "w", encoding="utf-8") as f:
             json.dump(json_data, f, indent=4, ensure_ascii=False)
-
         logger.info(f"Updated JSON structure for {file_handler.file_path}.")
 
+        # Convert updated structures to Markdown
         markdown = file_handler.convert_to_markdown_file(file_handler.file_path)
         file_handler.write_file(
             os.path.join(
@@ -447,64 +427,46 @@ class Runner:
         )
         logger.info(f"Updated Markdown doc for {file_handler.file_path}.")
 
+        # Stage
         git_add_result = self.change_detector.add_unstaged_files()
-        if len(git_add_result) > 0:
-            logger.info(f"Added {[file for file in git_add_result]} to staging.")
+        if git_add_result:
+            logger.info(f"Added {[file for file in git_add_result]} to the staging area.")
+
 
     def update_existing_item(self, file_dict, file_handler, changes_in_pyfile):
         """
-        Update existing projects.
-
-        Args:
-            file_dict (dict): A dictionary containing file structure information.
-            file_handler (FileHandler): The file handler object.
-            changes_in_pyfile (dict): A dictionary containing information about the objects that have changed in the file.
-
-        Returns:
-            dict: The updated file structure information dictionary.
+        Update existing file structures when objects are added/removed
+        or changed. Spawns doc generation for newly added objects.
         """
         new_obj, del_obj = self.get_new_objects(file_handler)
 
-        # 处理被删除的对象
-        for obj_name in del_obj:  # 真正被删除的对象
+        # Remove truly deleted objects
+        for obj_name in del_obj:
             if obj_name in file_dict:
                 del file_dict[obj_name]
-                logger.info(f"已删除 {obj_name} 对象。")
+                logger.info(f"Removed object {obj_name}.")
 
-        referencer_list = []
-
-        # 生成文件的结构信息，获得当前文件中的所有对象， 这里其实就是文件更新之后的结构了
+        # Generate new structure from code
         current_objects = file_handler.generate_file_structure(file_handler.file_path)
-
         current_info_dict = {obj["name"]: obj for obj in current_objects.values()}
 
-        # 更新全局文件结构信息，比如代码起始行\终止行等
+        # Update or add new items in the file_dict
         for current_obj_name, current_obj_info in current_info_dict.items():
             if current_obj_name in file_dict:
-                # 如果当前对象在旧对象列表中存在，更新旧对象的信息
                 file_dict[current_obj_name]["type"] = current_obj_info["type"]
-                file_dict[current_obj_name]["code_start_line"] = current_obj_info[
-                    "code_start_line"
-                ]
-                file_dict[current_obj_name]["code_end_line"] = current_obj_info[
-                    "code_end_line"
-                ]
+                file_dict[current_obj_name]["code_start_line"] = current_obj_info["code_start_line"]
+                file_dict[current_obj_name]["code_end_line"] = current_obj_info["code_end_line"]
                 file_dict[current_obj_name]["parent"] = current_obj_info["parent"]
-                file_dict[current_obj_name]["name_column"] = current_obj_info[
-                    "name_column"
-                ]
+                file_dict[current_obj_name]["name_column"] = current_obj_info["name_column"]
             else:
-                # 如果当前对象在旧对象列表中不存在，将新对象添加到旧对象列表中
                 file_dict[current_obj_name] = current_obj_info
 
-        # 对于每一个对象：获取其引用者列表
+        # Determine referencers for newly added objects
+        referencer_list = []
         for obj_name, _ in changes_in_pyfile["added"]:
-            for current_object in current_objects.values():  # 引入new_objects的目的是获取到find_all_referencer中必要的参数信息。在changes_in_pyfile['added']中只有对象和其父级结构的名称，缺少其他参数
-                if (
-                    obj_name == current_object["name"]
-                ):  # 确保只有当added中的对象名称匹配new_objects时才添加引用者
-                    # 获取每个需要生成文档的对象的引用者
-                    referencer_obj = {
+            for current_object in current_objects.values():
+                if obj_name == current_object["name"]:
+                    referencer_list.append({
                         "obj_name": obj_name,
                         "obj_referencer_list": self.project_manager.find_all_referencer(
                             variable_name=current_object["name"],
@@ -512,19 +474,14 @@ class Runner:
                             line_number=current_object["code_start_line"],
                             column_number=current_object["name_column"],
                         ),
-                    }
-                    referencer_list.append(
-                        referencer_obj
-                    )  # 对于每一个正在处理的对象，添加他的引用者字典到全部对象的应用者列表中
+                    })
 
+        # Generate docs for newly added objects in parallel
         with ThreadPoolExecutor(max_workers=5) as executor:
-            # 通过线程池并发执行
             futures = []
-            for changed_obj in changes_in_pyfile["added"]:  # 对于每一个待处理的对象
+            for changed_obj in changes_in_pyfile["added"]:
                 for ref_obj in referencer_list:
-                    if (
-                        changed_obj[0] == ref_obj["obj_name"]
-                    ):  # 在referencer_list中找到它的引用者字典！
+                    if changed_obj[0] == ref_obj["obj_name"]:
                         future = executor.submit(
                             self.update_object,
                             file_dict,
@@ -533,53 +490,36 @@ class Runner:
                             ref_obj["obj_referencer_list"],
                         )
                         print(
-                            f"正在生成 {Fore.CYAN}{file_handler.file_path}{Style.RESET_ALL}中的{Fore.CYAN}{changed_obj[0]}{Style.RESET_ALL}对象文档."
+                            f"Generating doc for {Fore.CYAN}{file_handler.file_path}"
+                            f"{Style.RESET_ALL} => object {Fore.CYAN}{changed_obj[0]}{Style.RESET_ALL}."
                         )
                         futures.append(future)
-
             for future in futures:
                 future.result()
 
-        # 更新传入的file参数
         return file_dict
+
 
     def update_object(self, file_dict, file_handler, obj_name, obj_referencer_list):
         """
-        Generate documentation content and update corresponding field information of the object.
-
-        Args:
-            file_dict (dict): A dictionary containing old object information.
-            file_handler: The file handler.
-            obj_name (str): The object name.
-            obj_referencer_list (list): The list of object referencers.
-
-        Returns:
-            None
+        Given a single object's metadata, update the doc content using ChatEngine.
         """
+        # Flattened guard: only update if the object is present
         if obj_name not in file_dict:
             return
 
         obj = file_dict[obj_name]
-        response_message = self.chat_engine.generate_doc(
-                obj, file_handler, obj_referencer_list
-        )
+        response_message = self.chat_engine.generate_doc(obj, file_handler, obj_referencer_list)
         obj["md_content"] = response_message.content
+
 
     def get_new_objects(self, file_handler):
         """
-        The function gets the added and deleted objects by comparing the current version and the previous version of the .py file.
-
-        Args:
-            file_handler (FileHandler): The file handler object.
-
-        Returns:
-            tuple: A tuple containing the added and deleted objects, in the format (new_obj, del_obj)
-
-        Output example:
-            new_obj: ['add_context_stack', '__init__']
-            del_obj: []
+        Compare current and previous file versions to detect
+        new or deleted objects (functions/classes).
         """
         current_version, previous_version = file_handler.get_modified_file_versions()
+
         parse_current_py = file_handler.get_functions_and_classes(current_version)
         parse_previous_py = (
             file_handler.get_functions_and_classes(previous_version)
@@ -595,9 +535,20 @@ class Runner:
         return new_obj, del_obj
 
 
+    def git_commit(self, commit_message):
+        """
+        Simple Git commit wrapper that disables pre-commit hooks via --no-verify.
+        """
+        try:
+            subprocess.check_call(
+                ["git", "commit", "--no-verify", "-m", commit_message],
+                shell=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"An error occurred while trying to commit {str(e)}")
+
+
 if __name__ == "__main__":
     runner = Runner()
-
     runner.run()
-
     logger.info("文档任务完成。")
