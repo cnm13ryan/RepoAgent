@@ -29,6 +29,14 @@ class FileHandler:
             setting.project.target_repo / setting.project.hierarchy_name
         )
 
+    def _read_file_content(self, relative_path):
+        """
+        Safely read file content given a path relative to the repo root.
+        """
+        abs_path = os.path.join(self.repo_path, relative_path)
+        with open(abs_path, "r", encoding="utf-8") as f:
+            return f.read()
+
     def read_file(self):
         """
         Read the file content
@@ -36,11 +44,7 @@ class FileHandler:
         Returns:
             str: The content of the current changed file
         """
-        abs_file_path = os.path.join(self.repo_path, self.file_path)
-
-        with open(abs_file_path, "r", encoding="utf-8") as file:
-            content = file.read()
-        return content
+        return self._read_file_content(self.file_path)
 
     def get_obj_code_info(
         self, code_type, code_name, start_line, end_line, params, file_path=None
@@ -69,14 +73,15 @@ class FileHandler:
         code_info["params"] = params
 
         with open(
-            os.path.join(
-                self.repo_path, file_path if file_path != None else self.file_path
-            ),
-            "r",
-            encoding="utf-8",
-        ) as code_file:
-            lines = code_file.readlines()
-            code_content = "".join(lines[start_line - 1 : end_line])
+                os.path.join(
+                    self.repo_path, 
+                    file_path if file_path else self.file_path
+                    ),
+                "r", 
+                encoding="utf-8"
+                ) as f:
+            lines = f.readlines()
+            code_content = "".join(lines[start_line - 1:end_line])
             # 获取对象名称在第一行代码中的位置
             name_column = lines[start_line - 1].find(code_name)
             # 判断代码中是否有return字样
