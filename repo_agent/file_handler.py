@@ -255,12 +255,12 @@ class FileHandler:
         for not_ignored_files in bar:
             normal_file_names = not_ignored_files
             if not_ignored_files in jump_files:
-                print(
+                logger.info(
                     f"{Fore.LIGHTYELLOW_EX}[File-Handler] Unstaged AddFile, ignore this file: {Style.RESET_ALL}{normal_file_names}"
                 )
                 continue
             elif not_ignored_files.endswith(latest_verison_substring):
-                print(
+                logger.info(
                     f"{Fore.LIGHTYELLOW_EX}[File-Handler] Skip Latest Version, Using Git-Status Version]: {Style.RESET_ALL}{normal_file_names}"
                 )
                 continue
