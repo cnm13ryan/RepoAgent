@@ -19,7 +19,7 @@ class LogLevel(StrEnum):
 
 
 class ProjectSettings(BaseSettings):
-    target_repo: DirectoryPath = ""  # type: ignore
+    target_repo: DirectoryPath = Field(default=".") 
     hierarchy_name: str = ".project_doc_record"
     markdown_docs_name: str = "markdown_docs"
     ignore_list: list[str] = []
