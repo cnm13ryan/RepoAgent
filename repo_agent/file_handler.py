@@ -72,14 +72,10 @@ class FileHandler:
         code_info["code_end_line"] = end_line
         code_info["params"] = params
 
-        with open(
-                os.path.join(
-                    self.repo_path, 
-                    file_path if file_path else self.file_path
-                    ),
-                "r", 
-                encoding="utf-8"
-                ) as f:
+        target_path = file_path if file_path is not None else self.file_path
+        full_path = os.path.join(self.repo_path, target_path)
+
+        with open(full_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
             code_content = "".join(lines[start_line - 1:end_line])
             # 获取对象名称在第一行代码中的位置
