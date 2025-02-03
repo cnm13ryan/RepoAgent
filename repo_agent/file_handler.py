@@ -1,5 +1,3 @@
-# FileHandler 类，实现对文件的读写操作，这里的文件包括markdown文件和python文件
-# repo_agent/file_handler.py
 import ast
 import json
 import os
@@ -16,15 +14,20 @@ from repo_agent.utils.meta_info_utils import latest_verison_substring
 
 class FileHandler:
     """
-    历变更后的文件的循环中，为每个变更后文件（也就是当前文件）创建一个实例
+    A class for handling file operations (reading, writing, etc.).
+    Typically used per changed file in the repository.
     """
 
     def __init__(self, repo_path, file_path):
-        self.file_path = file_path  # 这里的file_path是相对于仓库根目录的路径
+        """
+        Args:
+            repo_path (str): Absolute path to the repository root.
+            file_path (str): Relative path from repo root to the target file.
+        """
+        self.file_path = file_path
         self.repo_path = repo_path
 
         setting = SettingsManager.get_setting()
-
         self.project_hierarchy = (
             setting.project.target_repo / setting.project.hierarchy_name
         )
@@ -32,6 +35,8 @@ class FileHandler:
     def _read_file_content(self, relative_path):
         """
         Safely read file content given a path relative to the repo root.
+        Returns:
+            str: The entire file content.
         """
         abs_path = os.path.join(self.repo_path, relative_path)
         with open(abs_path, "r", encoding="utf-8") as f:
@@ -39,10 +44,10 @@ class FileHandler:
 
     def read_file(self):
         """
-        Read the file content
+        Read the file content of the current file_path.
 
         Returns:
-            str: The content of the current changed file
+            str: The content of the current changed file.
         """
         return self._read_file_content(self.file_path)
 
@@ -50,18 +55,18 @@ class FileHandler:
         self, code_type, code_name, start_line, end_line, params, file_path=None
     ):
         """
-        Get the code information for a given object.
+        Get the code information for a given object (function/class/async).
 
         Args:
-            code_type (str): The type of the code.
-            code_name (str): The name of the code.
+            code_type (str): The type of the code ('FunctionDef', 'ClassDef', etc.).
+            code_name (str): The name of the code object.
             start_line (int): The starting line number of the code.
             end_line (int): The ending line number of the code.
-            parent (str): The parent of the code.
-            file_path (str, optional): The file path. Defaults to None.
+            params (list): List of parameter names.
+            file_path (str, optional): Relative file path. Defaults to None.
 
         Returns:
-            dict: A dictionary containing the code information.
+            dict: A dictionary containing code details (type, name, content, etc.).
         """
 
         code_info = {}
@@ -78,9 +83,11 @@ class FileHandler:
         with open(full_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
             code_content = "".join(lines[start_line - 1:end_line])
-            # 获取对象名称在第一行代码中的位置
+
+            # Find the object's name position in the first line
             name_column = lines[start_line - 1].find(code_name)
-            # 判断代码中是否有return字样
+
+            # Check if there's a "return" in the code block
             if "return" in code_content:
                 has_return = True
             else:
@@ -94,15 +101,13 @@ class FileHandler:
 
     def write_file(self, file_path, content):
         """
-        Write content to a file.
+        Write content to a file relative to the repo root.
 
         Args:
             file_path (str): The relative path of the file.
             content (str): The content to be written to the file.
         """
-        # 确保file_path是相对路径
         if file_path.startswith("/"):
-            # 移除开头的 '/'
             file_path = file_path[1:]
 
         abs_file_path = os.path.join(self.repo_path, file_path)
@@ -112,19 +117,19 @@ class FileHandler:
 
     def get_modified_file_versions(self):
         """
-        Get the current and previous versions of the modified file.
+        Get the current and previous versions of the file.
 
         Returns:
-            tuple: A tuple containing the current version and the previous version of the file.
+            tuple: (current_version, previous_version) as strings.
         """
         repo = git.Repo(self.repo_path)
 
-        # Read the file in the current working directory (current version)
+        # Current version
         current_version_path = os.path.join(self.repo_path, self.file_path)
         with open(current_version_path, "r", encoding="utf-8") as file:
             current_version = file.read()
 
-        # Get the file version from the last commit (previous version)
+        # Previous version from the last commit
         commits = list(repo.iter_commits(paths=self.file_path, max_count=1))
         previous_version = None
         if commits:
@@ -134,39 +139,38 @@ class FileHandler:
                     (commit.tree / self.file_path).data_stream.read().decode("utf-8")
                 )
             except KeyError:
-                previous_version = None  # The file may be newly added and not present in previous commits
+                # File may be newly added
+                previous_version = None
 
         return current_version, previous_version
 
     def get_end_lineno(self, node):
         """
-        Get the end line number of a given node.
+        Recursively find the maximum end_lineno among a node and its children.
 
         Args:
-            node: The node for which to find the end line number.
+            node (ast.AST): The AST node.
 
         Returns:
-            int: The end line number of the node. Returns -1 if the node does not have a line number.
+            int: The final end line number. -1 if not applicable.
         """
         if not hasattr(node, "lineno"):
-            return -1  # 返回-1表示此节点没有行号
+            return -1
 
         end_lineno = node.lineno
         for child in ast.iter_child_nodes(node):
             child_end = getattr(child, "end_lineno", None) or self.get_end_lineno(child)
-            if child_end > -1:  # 只更新当子节点有有效行号时
+            if child_end > -1:
                 end_lineno = max(end_lineno, child_end)
         return end_lineno
 
     def add_parent_references(self, node, parent=None):
         """
-        Adds a parent reference to each node in the AST.
+        Recursively add 'parent' references to each child node in the AST.
 
         Args:
-            node: The current node in the AST.
-
-        Returns:
-            None
+            node (ast.AST): The current AST node.
+            parent (ast.AST, optional): The parent node. Defaults to None.
         """
         for child in ast.iter_child_nodes(node):
             child.parent = node
@@ -174,76 +178,62 @@ class FileHandler:
 
     def get_functions_and_classes(self, code_content):
         """
-        Retrieves all functions, classes, their parameters (if any), and their hierarchical relationships.
-        Output Examples: [('FunctionDef', 'AI_give_params', 86, 95, None, ['param1', 'param2']), ('ClassDef', 'PipelineEngine', 97, 104, None, []), ('FunctionDef', 'get_all_pys', 99, 104, 'PipelineEngine', ['param1'])]
-        On the example above, PipelineEngine is the Father structure for get_all_pys.
-
-        Args:
-            code_content: The code content of the whole file to be parsed.
+        Retrieves functions/classes/async functions from the AST.
 
         Returns:
-            A list of tuples containing the type of the node (FunctionDef, ClassDef, AsyncFunctionDef),
-            the name of the node, the starting line number, the ending line number, the name of the parent node, and a list of parameters (if any).
+            list: A list of tuples (type, name, start_line, end_line, params).
         """
         tree = ast.parse(code_content)
         self.add_parent_references(tree)
+
         functions_and_classes = []
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
+                start_line = node.lineno
+                end_line = self.get_end_lineno(node)
                 parameters = (
                     [arg.arg for arg in node.args.args] if "args" in dir(node) else []
                 )
-                all_names = [item[1] for item in functions_and_classes]
-                # (parent_name == None or parent_name in all_names) and
                 functions_and_classes.append(
                     (type(node).__name__, node.name, start_line, end_line, parameters)
                 )
+
         return functions_and_classes
 
     def generate_file_structure(self, file_path):
         """
-        Generates the file structure for the given file path.
+        Parse a file via AST and collect code objects' info.
 
         Args:
-            file_path (str): The relative path of the file.
+            file_path (str): Relative path of the file.
 
         Returns:
-            dict: A dictionary containing the file path and the generated file structure.
-
-        Output example:
-        {
-            "function_name": {
-                "type": "function",
-                "start_line": 10,
-                ··· ···
-                "end_line": 20,
-                "parent": "class_name"
-            },
-            "class_name": {
-                "type": "class",
-                "start_line": 5,
-                ··· ···
-                "end_line": 25,
-                "parent": None
-            }
-        }
+            list: A list of dicts with info about each found code object.
         """
-        with open(os.path.join(self.repo_path, file_path), "r", encoding="utf-8") as f:
-            content = f.read()
-            structures = self.get_functions_and_classes(content)
-            file_objects = []  # 以列表的形式存储
-            for struct in structures:
-                structure_type, name, start_line, end_line, params = struct
-                code_info = self.get_obj_code_info(
-                    structure_type, name, start_line, end_line, params, file_path
-                )
-                file_objects.append(code_info)
+        content = self._read_file_content(file_path)
+        structures = self.get_functions_and_classes(content)
+
+        file_objects = []
+        for struct in structures:
+            structure_type, name, start_line, end_line, params = struct
+            code_info = self.get_obj_code_info(
+                structure_type, name, start_line, end_line, params, file_path
+            )
+            file_objects.append(code_info)
 
         return file_objects
 
     def generate_overall_structure(self, file_path_reflections, jump_files) -> dict:
-        """获取目标仓库的文件情况，通过AST-walk获取所有对象等情况。
-        对于jump_files: 不会parse，当做不存在
+        """
+        Build a dictionary of file structures for all non-ignored files in the repo,
+        skipping certain files if needed.
+
+        Args:
+            file_path_reflections (dict): Possibly a map of some shadow paths.
+            jump_files (list): List of files to skip.
+
+        Returns:
+            dict: A mapping of filename -> list of code object info.
         """
         repo_structure = {}
         gitignore_checker = GitignoreChecker(
@@ -254,6 +244,7 @@ class FileHandler:
         bar = tqdm(gitignore_checker.check_files_and_folders())
         for not_ignored_files in bar:
             normal_file_names = not_ignored_files
+
             if not_ignored_files in jump_files:
                 logger.info(
                     f"{Fore.LIGHTYELLOW_EX}[File-Handler] Unstaged AddFile, ignore this file: {Style.RESET_ALL}{normal_file_names}"
@@ -274,21 +265,23 @@ class FileHandler:
                     f"Alert: An error occurred while generating file structure for {not_ignored_files}: {e}"
                 )
                 continue
+
             bar.set_description(f"generating repo structure: {not_ignored_files}")
+
         return repo_structure
 
     def convert_to_markdown_file(self, file_path=None):
         """
-        Converts the content of a file to markdown format.
+        Convert the file structure (as stored in project_hierarchy.json) to a markdown outline.
 
         Args:
-            file_path (str, optional): The relative path of the file to be converted. If not provided, the default file path, which is None, will be used.
+            file_path (str, optional): The relative path of the file to be converted.
 
         Returns:
-            str: The content of the file in markdown format.
+            str: The content in markdown format.
 
         Raises:
-            ValueError: If no file object is found for the specified file path in project_hierarchy.json.
+            ValueError: If no corresponding entry is found in project_hierarchy.json.
         """
         with open(self.project_hierarchy, "r", encoding="utf-8") as f:
             json_data = json.load(f)
@@ -296,10 +289,7 @@ class FileHandler:
         if file_path is None:
             file_path = self.file_path
 
-        # Find the file object in json_data that matches file_path
-
         file_dict = json_data.get(file_path)
-
         if file_dict is None:
             raise ValueError(
                 f"No file object found for {self.file_path} in project_hierarchy.json"
@@ -308,9 +298,11 @@ class FileHandler:
         markdown = ""
         parent_dict = {}
         objects = sorted(file_dict.values(), key=lambda obj: obj["code_start_line"])
+
         for obj in objects:
             if obj["parent"] is not None:
                 parent_dict[obj["name"]] = obj["parent"]
+
         current_parent = None
         for obj in objects:
             level = 1
@@ -318,18 +310,19 @@ class FileHandler:
             while parent is not None:
                 level += 1
                 parent = parent_dict.get(parent)
+
             if level == 1 and current_parent is not None:
                 markdown += "***\n"
             current_parent = obj["name"]
+
             params_str = ""
             if obj["type"] in ["FunctionDef", "AsyncFunctionDef"]:
                 params_str = "()"
                 if obj["params"]:
                     params_str = f"({', '.join(obj['params'])})"
-            markdown += f"{'#' * level} {obj['type']} {obj['name']}{params_str}:\n"
-            markdown += (
-                f"{obj['md_content'][-1] if len(obj['md_content']) >0 else ''}\n"
-            )
-        markdown += "***\n"
 
+            markdown += f"{'#' * level} {obj['type']} {obj['name']}{params_str}:\n"
+            markdown += f"{obj['md_content'][-1] if len(obj['md_content']) > 0 else ''}\n"
+
+        markdown += "***\n"
         return markdown
