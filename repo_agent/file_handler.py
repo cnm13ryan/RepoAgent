@@ -81,11 +81,11 @@ class FileHandler:
             name_column = lines[start_line - 1].find(code_name)
             # 判断代码中是否有return字样
             if "return" in code_content:
-                have_return = True
+                has_return = True
             else:
-                have_return = False
+                has_return = False
 
-            code_info["have_return"] = have_return
+            code_info["has_return"] = has_return
             code_info["code_content"] = code_content
             code_info["name_column"] = name_column
 
