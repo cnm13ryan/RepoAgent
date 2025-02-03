@@ -12,24 +12,22 @@ class ChatEngine:
     """
 
     def __init__(self, project_manager):
-        setting = SettingsManager.get_setting()
+        self.settings = SettingsManager.get_setting()
 
         self.llm = Ollama(
-            api_key=setting.chat_completion.openai_api_key.get_secret_value(),
-            api_base=setting.chat_completion.openai_base_url,
-            request_timeout=setting.chat_completion.request_timeout,
-            model=setting.chat_completion.model,
-            temperature=setting.chat_completion.temperature,
+            api_key=self.settings.chat_completion.openai_api_key.get_secret_value(),
+            api_base=self.settings.chat_completion.openai_base_url,
+            request_timeout=self.settings.chat_completion.request_timeout,
+            model=self.settings.chat_completion.model,
+            temperature=self.settings.chat_completion.temperature,
             max_retries=1,
             is_chat_model=True,
         )
 
     def build_prompt(self, doc_item: DocItem):
         """Builds and returns the system and user prompts based on the DocItem."""
-        setting = SettingsManager.get_setting()
-
         code_info = doc_item.content
-        referenced = len(doc_item.who_reference_me) > 0
+        is_referenced = len(doc_item.who_reference_me) > 0
 
         code_type = code_info["type"]
         code_name = code_info["name"]
@@ -44,8 +42,12 @@ class ChatEngine:
                 """As you can see, the code calls the following objects, their code and docs are as following:"""
             ]
             for reference_item in doc_item.reference_who:
+                doc_text = reference_item.md_content[-1] if reference_item.md_content else "None"
+                code_snippet = reference_item.content.get("code_content", "")
                 instance_prompt = (
-                    f"""obj: {reference_item.get_full_name()}\nDocument: \n{reference_item.md_content[-1] if len(reference_item.md_content) > 0 else 'None'}\nRaw code:```\n{reference_item.content['code_content'] if 'code_content' in reference_item.content.keys() else ''}\n```"""
+                    f"obj: {reference_item.get_full_name()}\n"
+                    f"Document: \n{doc_text}\n"
+                    f"Raw code:```\n{code_snippet}\n```"
                     + "=" * 10
                 )
                 prompt.append(instance_prompt)
@@ -58,8 +60,12 @@ class ChatEngine:
                 """Also, the code has been called by the following objects, their code and docs are as following:"""
             ]
             for referencer_item in doc_item.who_reference_me:
+                doc_text = referencer_item.md_content[-1] if referencer_item.md_content else "None"
+                code_snippet = referencer_item.content.get("code_content", "None")
                 instance_prompt = (
-                    f"""obj: {referencer_item.get_full_name()}\nDocument: \n{referencer_item.md_content[-1] if len(referencer_item.md_content) > 0 else 'None'}\nRaw code:```\n{referencer_item.content['code_content'] if 'code_content' in referencer_item.content.keys() else 'None'}\n```"""
+                    f"obj: {referencer_item.get_full_name()}\n"
+                    f"Document: \n{doc_text}\n"
+                    f"Raw code:```\n{code_snippet}\n```"
                     + "=" * 10
                 )
                 prompt.append(instance_prompt)
@@ -86,7 +92,7 @@ class ChatEngine:
         )
         combine_ref_situation = (
             "and combine it with its calling situation in the project,"
-            if referenced
+            if is_referenced
             else ""
         )
 
@@ -110,26 +116,30 @@ class ChatEngine:
             reference_letter=reference_letter,
             referencer_content=referencer_content,
             parameters_or_attribute=parameters_or_attribute,
-            language=setting.project.language,
+            language=self.settings.project.language,
         )
+
     def generate_doc(self, doc_item: DocItem):
         """Generates documentation for a given DocItem."""
         messages = self.build_prompt(doc_item)
 
+        # Begin LLM call
         try:
             logger.debug(f"Sending messages to LLM: {messages}")
             response = self.llm.chat(messages)
-            
-            # Safely access 'usage' if it exists
+
+            # Check usage in response
             if hasattr(response.raw, 'usage') and isinstance(response.raw.usage, dict):
                 logger.debug(f"LLM Prompt Tokens: {response.raw.usage.get('prompt_tokens')}")
                 logger.debug(f"LLM Completion Tokens: {response.raw.usage.get('completion_tokens')}")
                 logger.debug(f"Total LLM Token Count: {response.raw.usage.get('total_tokens')}")
             else:
                 logger.debug("No usage information available in response.")
-            
+
+            # Log final content
             logger.debug(f"LLM Response: {response.message.content}")
             return response.message.content
+
         except Exception as e:
             logger.error(f"Error in llamaindex chat call: {e}")
             raise
