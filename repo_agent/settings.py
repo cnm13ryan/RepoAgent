@@ -1,3 +1,7 @@
+from enum import StrEnum
+from pathlib import Path
+from typing import Optional
+
 from iso639 import Language, LanguageNotFoundError
 from pydantic import (
     DirectoryPath,
@@ -10,6 +14,7 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings
 
+
 class LogLevel(StrEnum):
     DEBUG = "DEBUG"
     INFO = "INFO"
@@ -19,7 +24,7 @@ class LogLevel(StrEnum):
 
 
 class ProjectSettings(BaseSettings):
-    target_repo: DirectoryPath = Field(default=".") 
+    target_repo: DirectoryPath = Field(default=".")
     hierarchy_name: str = ".project_doc_record"
     markdown_docs_name: str = "markdown_docs"
     ignore_list: list[str] = []
@@ -43,15 +48,13 @@ class ProjectSettings(BaseSettings):
     def validate_log_level(cls, v: str) -> LogLevel:
         if isinstance(v, str):
             v = v.upper()  # Convert input to uppercase
-        if (
-            v in LogLevel._value2member_map_
-        ):  # Check if the converted value is in enum members
+        if v in LogLevel._value2member_map_:
             return LogLevel(v)
         raise ValueError(f"Invalid log level: {v}")
 
 
 class ChatCompletionSettings(BaseSettings):
-    model: str = "gpt-4o-mini"  # NOTE: No model restrictions for user flexibility, but it's recommended to use models with a larger context window.
+    model: str = "gpt-4o-mini"  # NOTE: recommended to use models with a larger context window
     temperature: PositiveFloat = 0.2
     request_timeout: PositiveInt = 60
     openai_base_url: str = "https://api.openai.com/v1"
@@ -68,13 +71,8 @@ class Setting(BaseSettings):
     chat_completion: ChatCompletionSettings = Field(default_factory=ChatCompletionSettings)
 
 
- class SettingsManager:
-
-
 class SettingsManager:
-    _setting_instance: Optional[Setting] = (
-        None  # Private class attribute, initially None
-    )
+    _setting_instance: Optional[Setting] = None  # Private class attribute, initially None
 
     @classmethod
     def get_setting(cls):
