@@ -40,7 +40,7 @@ class ProjectSettings(BaseSettings):
 
     @field_validator("log_level", mode="before")
     @classmethod
-    def set_log_level(cls, v: str) -> LogLevel:
+    def validate_log_level(cls, v: str) -> LogLevel:
         if isinstance(v, str):
             v = v.upper()  # Convert input to uppercase
         if (
