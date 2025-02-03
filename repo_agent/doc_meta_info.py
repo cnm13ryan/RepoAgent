@@ -192,7 +192,7 @@ class DocItem:
         current = self
         while current is not None:
             current_name = current.obj_name
-            if strict:
+            if strict and current.father is not None:
                 for name, item in current.father.children.items():
                     if item == current:
                         current_name = name
