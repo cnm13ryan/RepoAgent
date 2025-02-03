@@ -17,8 +17,7 @@ dependencies = [
     "colorama>=0.4.6",
     "click>=8.1.7",
     "python-iso639>=2024.10.22",
-    "llama-index-llms-openai>=0.2.16",
-    "llama-index-llms-ollama>=0.4.2",
+    "llama-index-llms-ollama>=0.5.0",
 ]
 name = "repoagent"
 version = "0.1.5"
