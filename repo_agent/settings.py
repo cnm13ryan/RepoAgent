@@ -64,8 +64,11 @@ class ChatCompletionSettings(BaseSettings):
 
 
 class Setting(BaseSettings):
-    project: ProjectSettings = {}  # type: ignore
-    chat_completion: ChatCompletionSettings = {}  # type: ignore
+    project: ProjectSettings = Field(default_factory=ProjectSettings)
+    chat_completion: ChatCompletionSettings = Field(default_factory=ChatCompletionSettings)
+
+
+ class SettingsManager:
 
 
 class SettingsManager:
