@@ -86,8 +86,6 @@ class FileHandler:
                 have_return = False
 
             code_info["have_return"] = have_return
-            # # 使用 json.dumps 来转义字符串，并去掉首尾的引号
-            # code_info['code_content'] = json.dumps(code_content)[1:-1]
             code_info["code_content"] = code_content
             code_info["name_column"] = name_column
 
@@ -191,19 +189,6 @@ class FileHandler:
         functions_and_classes = []
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
-                # if node.name == "recursive_check":
-                #     import pdb; pdb.set_trace()
-                start_line = node.lineno
-                end_line = self.get_end_lineno(node)
-                # def get_recursive_parent_name(node):
-                #     now = node
-                #     while "parent" in dir(now):
-                #         if isinstance(now.parent, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
-                #             assert 'name' in dir(now.parent)
-                #             return now.parent.name
-                #         now = now.parent
-                #     return None
-                # parent_name = get_recursive_parent_name(node)
                 parameters = (
                     [arg.arg for arg in node.args.args] if "args" in dir(node) else []
                 )
@@ -278,19 +263,6 @@ class FileHandler:
                     f"{Fore.LIGHTYELLOW_EX}[File-Handler] Skip Latest Version, Using Git-Status Version]: {Style.RESET_ALL}{normal_file_names}"
                 )
                 continue
-            # elif not_ignored_files.endswith(latest_version):
-            #     """如果某文件被删除但没有暂存，文件系统有fake_file但没有对应的原始文件"""
-            #     for k,v in file_path_reflections.items():
-            #         if v == not_ignored_files and not os.path.exists(os.path.join(setting.project.target_repo, not_ignored_files)):
-            #             print(f"{Fore.LIGHTYELLOW_EX}[Unstaged DeleteFile] load fake-file-content: {Style.RESET_ALL}{k}")
-            #             normal_file_names = k #原来的名字
-            #             break
-            #     if normal_file_names == not_ignored_files:
-            #         continue
-
-            # if not_ignored_files in file_path_reflections.keys():
-            #     not_ignored_files = file_path_reflections[not_ignored_files] #获取fake_file_path
-            #     print(f"{Fore.LIGHTYELLOW_EX}[Unstaged ChangeFile] load fake-file-content: {Style.RESET_ALL}{normal_file_names}")
 
             try:
                 repo_structure[normal_file_names] = self.generate_file_structure(
