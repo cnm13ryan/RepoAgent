@@ -1,25 +1,25 @@
 # repo_agent/log.py
+
 import inspect
 import logging
 import sys
 
 from loguru import logger
 
-logger = logger.opt(colors=True)
 """
 RepoAgent 日志记录器对象。
 
 默认信息:
 - 格式: `[%(asctime)s %(name)s] %(levelname)s: %(message)s`
-- 等级: `INFO` ，根据 `CONFIG["log_level"]` 配置改变
-- 输出: 输出至 stdout
+- 等级: `INFO`，根据 `CONFIG["log_level"]` 配置改变
+- 输出: 输出至 stderr
 
 用法示例:
     ```python
     from repo_agent.log import logger
     
     # 基本消息记录
-    logger.info("It <green>works</>!") # 使用颜色
+    logger.info("It <green>works</>!")  # 使用颜色
 
     # 记录异常信息
     try:
@@ -37,8 +37,9 @@ RepoAgent 日志记录器对象。
     # 记录错误信息
     logger.error("An error occurred")
     ```
-
 """
+
+logger = logger.opt(colors=True)
 
 
 class InterceptHandler(logging.Handler):
@@ -61,7 +62,7 @@ class InterceptHandler(logging.Handler):
         )
 
 
-def set_logger_level_from_config(log_level):
+def set_logger_level_from_config(log_level: str) -> None:
     """
     Configures the loguru logger with specified log level and integrates it with the standard logging module.
 
