@@ -592,7 +592,7 @@ class MetaInfo:
             item_deps = list(set(item_deps))  # 去重
 
             if task_available_func(target_item):
-                task_id = task_manager.add_task(dependency_task_id=item_deps, extra=target_item)
+                task_id = task_manager.add_task(dependency_task_ids=item_deps, extra=target_item)
                 target_item.multithread_task_id = task_id
 
             deal_items.append(target_item)
