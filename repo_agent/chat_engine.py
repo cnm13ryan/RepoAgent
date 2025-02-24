@@ -32,7 +32,7 @@ class ChatEngine:
         code_type = code_info["type"]
         code_name = code_info["name"]
         code_content = code_info["code_content"]
-        have_return = code_info["have_return"]
+        have_return = code_info.get("have_return", False)
         file_path = doc_item.get_full_name()
 
         def get_referenced_prompt(doc_item: DocItem) -> str:
