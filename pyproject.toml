@@ -1,73 +1,70 @@
 [project]
-authors = [
-    {name = "Qinyu Luo", email = "qinyuluo123@gmail.com"},
-]
-maintainers = [
-    {name = "Edwards Arno", email = "Edwards.Arno@outlook.com"},
-]
-license = {text = "Apache-2.0"}
+name            = "repoagent"
+description     = "An LLM-Powered Framework for repository-level code-documentation generation."
+authors         = [{ name = "Qinyu Luo",   email = "qinyuluo123@gmail.com" }]
+maintainers     = [{ name = "Edwards Arno", email = "Edwards.Arno@outlook.com" }]
 requires-python = ">=3.11,<4.0"
+license         = { file = "LICENSE" }
+readme          = { file = "README.md", content-type = "text/markdown" }
+
+dynamic = ["version"]          # read from VCS tag
+
 dependencies = [
-    "loguru>=0.7.2",
-    "jedi>=0.19.1",
     "GitPython>=3.1.41",
-    "prettytable>=3.9.0",
-    "python-iso639>=2024.2.7",
-    "pydantic-settings>=2.2.1",
-    "colorama>=0.4.6",
     "click>=8.1.7",
-    "python-iso639>=2024.10.22",
+    "colorama>=0.4.6",
+    "jedi>=0.19.1",
     "llama-index-llms-ollama>=0.5.0",
+    "loguru>=0.7.2",
+    "prettytable>=3.9.0",
+    "pydantic-settings>=2.2.1",
+    "python-iso639>=2024.10.22",
 ]
-name = "repoagent"
-version = "0.1.5"
-description = "An LLM-Powered Framework for Repository-level Code Documentation Generation."
-readme = "README.md"
+
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 [project.urls]
-repository = "https://github.com/LOGIC-10/RepoAgent"
+Repository = "https://github.com/LOGIC-10/RepoAgent"
 
 [project.scripts]
 repoagent = "repo_agent.main:cli"
 
 [project.optional-dependencies]
-chat_with_repo = [
-    "markdown>=3.7",
+chat-with-repo = [
+    "gradio>=5.6.0",
     "llama-index-embeddings-openai>=0.2.5",
     "llama-index-vector-stores-chroma>=0.3.0",
-    "gradio>=5.6.0",
+    "markdown>=3.7",
+]
+
+test = [
+    "pytest>=7.4.4,<8.0.0",
+    "pytest-mock>=3.12.0,<4.0.0",
+]
+
+lint = [
+    "ruff>=0.7.4",
 ]
 
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
+[tool.pdm.version]
+source            = "scm"
+fallback_version  = "0.0.0"
+
 [tool.pyright]
-reportCallIssue="none"
+reportCallIssue = "none"
 
 [tool.ruff]
-# General ruff settings can stay here.
+# Base settings…
 
 [tool.ruff.lint]
-select = ["I001"] 
-
-[tool.pdm]
-[tool.pdm.dev-dependencies]
-test = [
-    "pytest<8.0.0,>=7.4.4",
-    "pytest-mock<4.0.0,>=3.12.0",
-]
-lint = [
-    "ruff>=0.7.4",
-]
-
-[tool.pdm.build]
-includes = [
-    "repo_agent",
-]
+select = ["I001"]
