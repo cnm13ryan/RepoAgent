@@ -40,8 +40,8 @@ class TextAnalysisTool:
         return markdown_str
 
     def nerquery(self, message):
-        instrcution = """
-Extract the most relevant class or function base on the following instrcution:
+        instruction = """
+Extract the most relevant class or function base on the following instruction:
 
 The output must strictly be a pure function name or class name, without any additional characters.
 For example:
@@ -49,7 +49,7 @@ Pure function names: calculateSum, processData
 Pure class names: MyClass, DataProcessor
 The output function name or class name should be only one.
         """
-        query = f"{instrcution}\n\nThe input is shown as bellow:\n{message}\n\nAnd now directly give your Output:"
+        query = f"{instruction}\n\nThe input is shown as below:\n{message}\n\nAnd now directly give your Output:"
         response = self.llm.complete(query)
         # logger.debug(f"Input: {message}, Output: {response}")
         return response
