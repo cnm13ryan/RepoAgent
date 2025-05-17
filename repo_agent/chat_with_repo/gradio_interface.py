@@ -133,7 +133,7 @@ class GradioInterface:
                     with gr.Column():
                         msg = gr.Textbox(label="Question Input", lines=4)
                         system = gr.Textbox(
-                            label="(Optional)insturction editing", lines=4
+                            label="(Optional) instruction editing", lines=4
                         )
                         btn = gr.Button("Submit")
                         btnc = gr.ClearButton()
