@@ -40,37 +40,52 @@ def handle_setting_error(e: ValidationError):
     )
 
 
-@cli.command()
-@click.option("--model", "-m", default="gpt-4o-mini", show_default=True, type=str,
-              help="Specifies the model to use for completion.")
-@click.option("--temperature", "-t", default=0.2, show_default=True, type=float,
-              help="Sets the generation temperature for the model. Lower values make the model more deterministic.")
-@click.option("--request-timeout", "-r", default=60, show_default=True, type=int,
-              help="Defines the timeout in seconds for the API request.")
-@click.option("--base-url", "-b", default="https://api.openai.com/v1", show_default=True, type=str,
-              help="The base URL for the API calls.")
-@click.option("--target-repo-path", "-tp", default="", show_default=True,
-              type=click.Path(file_okay=False),
-              help="The file system path to the target repository. This path is used as the root for documentation generation.")
-@click.option("--hierarchy-path", "-hp", default=".project_doc_record", show_default=True, type=str,
-              help="The name or path for the project hierarchy file, used to organize documentation structure.")
-@click.option("--markdown-docs-path", "-mdp", default="markdown_docs", show_default=True, type=str,
-              help="The folder path where Markdown documentation will be stored or generated.")
-@click.option("--ignore-list", "-i", default="",
-              help="A comma-separated list of files or directories to ignore during documentation generation.")
-@click.option("--language", "-l", default="English", show_default=True, type=str,
-              help="The ISO 639 code or language name for the documentation.")
-@click.option("--max-thread-count", "-mtc", default=4, show_default=True)
-@click.option("--log-level", "-ll", default="INFO", show_default=True,
-              type=click.Choice([level.value for level in LogLevel], case_sensitive=False),
-              help="Sets the logging level (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL) for the application.")
-@click.option("--print-hierarchy", "-pr", is_flag=True, show_default=True, default=False,
-              help="If set, prints the hierarchy of the target repository when finished running the main task.")
-def run(model, temperature, request_timeout, base_url, target_repo_path, hierarchy_path,
-        markdown_docs_path, ignore_list, language, max_thread_count, log_level, print_hierarchy):
-    """Run the program with the specified parameters."""
+# -------------------------- Helper Functions ---------------------------
+
+RUN_OPTIONS = [
+    click.option("--model", "-m", default="gpt-4o-mini", show_default=True, type=str,
+                 help="Specifies the model to use for completion."),
+    click.option("--temperature", "-t", default=0.2, show_default=True, type=float,
+                 help=("Sets the generation temperature for the model. "
+                       "Lower values make the model more deterministic.")),
+    click.option("--request-timeout", "-r", default=60, show_default=True, type=int,
+                 help="Defines the timeout in seconds for the API request."),
+    click.option("--base-url", "-b", default="https://api.openai.com/v1", show_default=True, type=str,
+                 help="The base URL for the API calls."),
+    click.option("--target-repo-path", "-tp", default="", show_default=True,
+                 type=click.Path(file_okay=False),
+                 help="The file system path to the target repository. This path is used as the root for documentation generation."),
+    click.option("--hierarchy-path", "-hp", default=".project_doc_record", show_default=True, type=str,
+                 help="The name or path for the project hierarchy file, used to organize documentation structure."),
+    click.option("--markdown-docs-path", "-mdp", default="markdown_docs", show_default=True, type=str,
+                 help="The folder path where Markdown documentation will be stored or generated."),
+    click.option("--ignore-list", "-i", default="",
+                 help="A comma-separated list of files or directories to ignore during documentation generation."),
+    click.option("--language", "-l", default="English", show_default=True, type=str,
+                 help="The ISO 639 code or language name for the documentation."),
+    click.option("--max-thread-count", "-mtc", default=4, show_default=True),
+    click.option("--log-level", "-ll", default="INFO", show_default=True,
+                 type=click.Choice([level.value for level in LogLevel], case_sensitive=False),
+                 help="Sets the logging level (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL) for the application."),
+    click.option("--print-hierarchy", "-pr", is_flag=True, show_default=True, default=False,
+                 help="If set, prints the hierarchy of the target repository when finished running the main task."),
+]
+
+
+def apply_run_options(func):
+    """Apply RUN_OPTIONS decorators to *func*."""
+    for option in reversed(RUN_OPTIONS):
+        func = option(func)
+    return func
+
+
+def initialize_settings(model: str, temperature: float, request_timeout: int, base_url: str,
+                         target_repo_path: str, hierarchy_path: str, markdown_docs_path: str,
+                         ignore_list: str, language: str, max_thread_count: int, log_level: str,
+                         **_ignored) -> bool:
+    """Parse CLI parameters and initialise project settings."""
     try:
-        parsed_ignore_list = [item.strip() for item in ignore_list.split(",") if item]
+        parsed_ignore_list = [item.strip() for item in ignore_list.split(',') if item]
 
         SettingsManager.initialize_with_params(
             target_repo=target_repo_path,
@@ -88,8 +103,12 @@ def run(model, temperature, request_timeout, base_url, target_repo_path, hierarc
         set_logger_level_from_config(log_level=log_level)
     except ValidationError as e:
         handle_setting_error(e)
-        return
+        return False
+    return True
 
+
+def run_runner(print_hierarchy: bool) -> None:
+    """Execute :class:`Runner` and optionally print hierarchy."""
     runner = Runner()
     runner.run()
     logger.success("Documentation task completed.")
@@ -97,6 +116,16 @@ def run(model, temperature, request_timeout, base_url, target_repo_path, hierarc
     if print_hierarchy:
         runner.meta_info.target_repo_hierarchical_tree.print_recursive()
         logger.success("Hierarchy printed.")
+
+
+@cli.command()
+@apply_run_options
+def run(**kwargs):
+    """Run the program with the specified parameters."""
+    if not initialize_settings(**kwargs):
+        return
+
+    run_runner(kwargs.get("print_hierarchy", False))
 
 
 @cli.command()
