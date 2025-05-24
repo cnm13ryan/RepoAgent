@@ -121,33 +121,40 @@ class ChangeDetector:
     # TODO: The key issue is that the changed line numbers correspond to the old function names (i.e., those removed) and the new function names (i.e., those added), and the current implementation does not handle this correctly.
     # We need a way to associate the changed line numbers with their function or class names before and after the change. One method is to build a mapping before processing changed_lines, which can map the names after the change back to the names before the change based on the line number.
     # Then, in the identify_changes_in_structure function, this mapping can be used to correctly identify the changed structure.
+    def _find_structure_for_line(self, line_number, structures):
+        """Return the (name, parent) tuple for the structure containing line."""
+        for (
+            _stype,
+            name,
+            start_line,
+            end_line,
+            parent_structure,
+        ) in structures:
+            if start_line <= line_number <= end_line:
+                return (name, parent_structure)
+        return None
+
     def identify_changes_in_structure(self, changed_lines, structures):
+        """Map changed lines to their surrounding structures.
+
+        ``changed_lines`` is produced by :py:meth:`parse_diffs` and maps the
+        change type (``"added"`` or ``"removed"``) to a list of ``(line_number,
+        line_content)`` tuples. ``structures`` is a sequence of items describing
+        the discovered functions/classes in a file where each item is ``(type,
+        name, start, end, parent)``.
+
+        The method returns a dictionary mapping change type to a set of
+        ``(name, parent)`` tuples representing the structures affected by the
+        changes.
         """
-        Identify the structure of the function or class where changes have occurred: Traverse all changed lines, for each line, it checks whether this line is between the start line and the end line of a structure (function or class).
-        If so, then this structure is considered to have changed, and its name and the name of the parent structure are added to the corresponding set in the result dictionary changes_in_structures (depending on whether this line is added or deleted).
 
-        Output example: {'added': {('PipelineAutoMatNode', None), ('to_json_new', 'PipelineAutoMatNode')}, 'removed': set()}
-
-        Args:
-            changed_lines (dict): A dictionary containing the line numbers where changes have occurred, {'added': [(line number, change content)], 'removed': [(line number, change content)]}
-            structures (list): The received is a list of function or class structures from get_functions_and_classes, each structure is composed of structure type, name, start line number, end line number, and parent structure name.
-
-        Returns:
-            dict: A dictionary containing the structures where changes have occurred, the key is the change type, and the value is a set of structure names and parent structure names.
-                Possible change types are 'added' (new) and 'removed' (removed).
-        """
         changes_in_structures = {"added": set(), "removed": set()}
         for change_type, lines in changed_lines.items():
             for line_number, _ in lines:
-                for (
-                    structure_type,
-                    name,
-                    start_line,
-                    end_line,
-                    parent_structure,
-                ) in structures:
-                    if start_line <= line_number <= end_line:
-                        changes_in_structures[change_type].add((name, parent_structure))
+                structure = self._find_structure_for_line(line_number, structures)
+                if structure:
+                    changes_in_structures[change_type].add(structure)
+
         return changes_in_structures
 
     # TODO:可能有错，需要单元测试覆盖； 可能有更好的实现方式
