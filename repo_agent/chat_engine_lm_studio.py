@@ -1,9 +1,11 @@
+from typing import Optional
+
 from llama_index.llms.lmstudio import LMStudio
 
 from repo_agent.doc_meta_info import DocItem
 from repo_agent.log import logger
 from repo_agent.prompt import chat_template
-from repo_agent.settings import SettingsManager
+from repo_agent.settings import Setting, SettingsManager
 
 
 class ChatEngine:
@@ -11,8 +13,8 @@ class ChatEngine:
     ChatEngine is used to generate the doc of functions or classes.
     """
 
-    def __init__(self, project_manager):
-        self.settings = SettingsManager.get_setting()
+    def __init__(self, project_manager, settings: Optional[Setting] = None):
+        self.settings = settings or SettingsManager.get_setting()
 
         self.llm = LMStudio(
             api_key=self.settings.chat_completion.openai_api_key.get_secret_value(),

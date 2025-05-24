@@ -7,6 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
+from typing import Optional
 
 from colorama import Fore, Style
 from tqdm import tqdm
@@ -18,17 +19,17 @@ from repo_agent.file_handler import FileHandler
 from repo_agent.log import logger
 from repo_agent.multi_task_dispatch import worker
 from repo_agent.project_manager import ProjectManager
-from repo_agent.settings import SettingsManager
+from repo_agent.settings import Setting, SettingsManager
 from repo_agent.utils.meta_info_utils import delete_fake_files, make_fake_files
 
 
 class Runner:
-    def __init__(self):
+    def __init__(self, settings: Optional[Setting] = None):
         """
         Initialize the Runner with settings, the project manager, and
         the meta_info structure that tracks documentation state.
         """
-        self.setting = SettingsManager.get_setting()
+        self.setting = settings or SettingsManager.get_setting()
         self.absolute_project_hierarchy_path = (
             self.setting.project.target_repo / self.setting.project.hierarchy_name
         )
@@ -41,7 +42,10 @@ class Runner:
         self.change_detector = ChangeDetector(
             repo_path=self.setting.project.target_repo
         )
-        self.chat_engine = ChatEngine(project_manager=self.project_manager)
+        self.chat_engine = ChatEngine(
+            project_manager=self.project_manager,
+            settings=self.setting,
+        )
 
         # Load or create meta_info
         if self.absolute_project_hierarchy_path.exists():
@@ -549,6 +553,6 @@ class Runner:
 
 
 if __name__ == "__main__":
-    runner = Runner()
+    runner = Runner(settings=SettingsManager.get_setting())
     runner.run()
     logger.info("文档任务完成。")

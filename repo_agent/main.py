@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from repo_agent.doc_meta_info import DocItem, MetaInfo
 from repo_agent.log import logger, set_logger_level_from_config
 from repo_agent.runner import Runner
-from repo_agent.settings import SettingsManager, LogLevel
+from repo_agent.settings import LogLevel, SettingsManager
 from repo_agent.utils.meta_info_utils import delete_fake_files, make_fake_files
 
 try:
@@ -90,7 +90,7 @@ def run(model, temperature, request_timeout, base_url, target_repo_path, hierarc
         handle_setting_error(e)
         return
 
-    runner = Runner()
+    runner = Runner(settings=SettingsManager.get_setting())
     runner.run()
     logger.success("Documentation task completed.")
 
@@ -116,7 +116,7 @@ def diff():
         return
 
     # Initialize the runner and ensure not mid-generation
-    runner = Runner()
+    runner = Runner(settings=setting)
 
     if runner.meta_info.in_generation_process:
         click.echo("Currently in the middle of a generation process; this command only supports a pre-check.")
