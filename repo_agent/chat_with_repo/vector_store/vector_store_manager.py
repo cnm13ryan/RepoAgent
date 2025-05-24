@@ -1,3 +1,5 @@
+"""Abstraction layer over the Chroma vector store."""
+
 import chromadb
 from llama_index.core import (
     Document,

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import mock_open, patch
 
-from repo_agent.chat_with_repo.json_handler import (
+from repo_agent.chat_with_repo.data_access.json_handler import (
     JsonFileProcessor,  # Adjust the import according to your project structure
 )
 

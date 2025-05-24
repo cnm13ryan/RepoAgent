@@ -1,7 +1,9 @@
+"""Lightweight NLP utilities used by the repository chat assistant."""
+
 from llama_index.core.llms.function_calling import FunctionCallingLLM
 from llama_index.llms.openai import OpenAI
 
-from repo_agent.chat_with_repo.json_handler import JsonFileProcessor
+from repo_agent.chat_with_repo.data_access.json_handler import JsonFileProcessor
 
 
 class TextAnalysisTool:
