@@ -1,5 +1,19 @@
-import os
+"""Utilities for temporary file management during documentation generation.
+
+This module encapsulates the side effects required to snapshot unstaged
+Python files. `FakeFileManager.make_temp_versions` renames the working
+copy to ``*_latest_version.py`` and writes the diff output back to the
+original path so other components operate on a clean tree. Once the
+documentation generation completes, call
+`FakeFileManager.delete_temp_versions` to restore or remove these
+temporary files.
+"""
+
+from __future__ import annotations
+
 import itertools
+import os
+from pathlib import Path
 
 import git
 from colorama import Fore, Style
@@ -7,121 +21,111 @@ from colorama import Fore, Style
 from repo_agent.log import logger
 from repo_agent.settings import SettingsManager
 
-latest_version_substring = "_latest_version.py"  # Suffix used for the backup (latest) version
+latest_version_substring = "_latest_version.py"
 
 
-def make_fake_files():
-    """
-    Analyze the current Git status (git status) and perform the following actions on any .py file
-    that is modified or deleted but not staged:
+class FakeFileManager:
+    """Manage temporary versions of Python files."""
 
-      1. If it is an untracked .py file: ignore (do not parse or generate documentation).
-      2. If it is a modified or deleted .py file (not yet staged):
-         - Rename the original file to (..._latest_version.py).
-         - Write the file content from the Git diff to the original filename.
-    
-    Note: If a file ends with latest_version_substring, this script will exit with an error,
-          since we never want to process files already named ..._latest_version.py.
-    """
-    delete_fake_files()
-    setting = SettingsManager.get_setting()
+    def __init__(self, repo_path: Path | None = None) -> None:
+        setting = SettingsManager.get_setting()
+        self.repo_path = Path(repo_path or setting.project.target_repo)
+        self.repo = git.Repo(self.repo_path)
 
-    repo = git.Repo(setting.project.target_repo)
-    unstaged_changes = repo.index.diff(None)  # Files modified but not committed (shown in git status)
-    untracked_files = repo.untracked_files    # Files present on the filesystem but not tracked by Git
+    # ------------------------------------------------------------------
+    def make_temp_versions(self) -> tuple[dict[str, str], list[str]]:
+        """Create temporary files representing unstaged changes."""
+        self.delete_temp_versions()
 
-    skipped_files = []  # Files to skip (won't parse, generate docs for, or calculate references)
-    for file_name in untracked_files:
-        if file_name.endswith(".py"):
-            print(f"{Fore.LIGHTMAGENTA_EX}[SKIP untracked files]: {Style.RESET_ALL}{file_name}")
-            skipped_files.append(file_name)
+        unstaged_changes = self.repo.index.diff(None)
+        untracked_files = self.repo.untracked_files
 
-    # For newly added files (not yet staged) that are .py, skip them
-    for diff_file in unstaged_changes.iter_change_type("A"):
-        if diff_file.a_path.endswith(latest_version_substring):
-            logger.error(
-                "FAKE_FILE_IN_GIT_STATUS detected! Please run `delete_fake_files` and regenerate documents."
-            )
-            exit()
-        skipped_files.append(diff_file.a_path)
-
-    file_path_reflections = {}
-
-    # For modified (M) or deleted (D) files (not staged)
-    for diff_file in itertools.chain(
-        unstaged_changes.iter_change_type("M"),
-        unstaged_changes.iter_change_type("D")
-    ):
-        if diff_file.a_path.endswith(latest_version_substring):
-            logger.error(
-                "FAKE_FILE_IN_GIT_STATUS detected! Please run `delete_fake_files` and regenerate documents."
-            )
-            exit()
-
-        now_file_path = diff_file.a_path  # Relative path within the repository
-        if now_file_path.endswith(".py"):
-            raw_file_content = diff_file.a_blob.data_stream.read().decode("utf-8")
-            latest_file_path = now_file_path[:-3] + latest_version_substring
-
-            # If the file still exists in the filesystem
-            if os.path.exists(os.path.join(setting.project.target_repo, now_file_path)):
-                os.rename(
-                    os.path.join(setting.project.target_repo, now_file_path),
-                    os.path.join(setting.project.target_repo, latest_file_path),
-                )
+        skipped_files: list[str] = []
+        for file_name in untracked_files:
+            if file_name.endswith(".py"):
                 print(
-                    f"{Fore.LIGHTMAGENTA_EX}[Save Latest Version of Code]: "
-                    f"{Style.RESET_ALL}{now_file_path} -> {latest_file_path}"
+                    f"{Fore.LIGHTMAGENTA_EX}[SKIP untracked files]: {Style.RESET_ALL}{file_name}"
                 )
-            else:
-                # If the file was deleted but not staged
-                print(
-                    f"{Fore.LIGHTMAGENTA_EX}[Create Temp-File for Deleted (Not Staged) Files]: "
-                    f"{Style.RESET_ALL}{now_file_path} -> {latest_file_path}"
+                skipped_files.append(file_name)
+
+        for diff_file in unstaged_changes.iter_change_type("A"):
+            if diff_file.a_path.endswith(latest_version_substring):
+                logger.error(
+                    "FAKE_FILE_IN_GIT_STATUS detected! Please run `delete_fake_files` and regenerate documents."
                 )
-                with open(os.path.join(setting.project.target_repo, latest_file_path), "w") as writer:
-                    pass  # Create an empty file
+                raise SystemExit
+            skipped_files.append(diff_file.a_path)
 
-            # Overwrite the original path with the content from the diff
-            with open(os.path.join(setting.project.target_repo, now_file_path), "w") as writer:
-                writer.write(raw_file_content)
+        file_path_reflections: dict[str, str] = {}
+        for diff_file in itertools.chain(
+            unstaged_changes.iter_change_type("M"),
+            unstaged_changes.iter_change_type("D"),
+        ):
+            if diff_file.a_path.endswith(latest_version_substring):
+                logger.error(
+                    "FAKE_FILE_IN_GIT_STATUS detected! Please run `delete_fake_files` and regenerate documents."
+                )
+                raise SystemExit
 
-            file_path_reflections[now_file_path] = latest_file_path  # Original file path points to the backup path
+            now_file_path = diff_file.a_path
+            if now_file_path.endswith(".py"):
+                raw_file_content = diff_file.a_blob.data_stream.read().decode("utf-8")
+                latest_file_path = now_file_path[:-3] + latest_version_substring
 
-    return file_path_reflections, skipped_files
+                absolute_now = self.repo_path / now_file_path
+                absolute_latest = self.repo_path / latest_file_path
 
-
-def delete_fake_files():
-    """
-    After a task completes, remove all files that end with _latest_version.py. 
-    If the backup file has content, rename it back to the original .py file. 
-    If the backup file is empty, simply delete it and the original file.
-    """
-    setting = SettingsManager.get_setting()
-
-    def delete_fake_files_recursively(filepath):
-        # Recursively traverse 'filepath' and process any file ending with latest_version_substring
-        files = os.listdir(filepath)
-        for fi in files:
-            fi_d = os.path.join(filepath, fi)
-            if os.path.isdir(fi_d):
-                delete_fake_files_recursively(fi_d)
-            elif fi_d.endswith(latest_version_substring):
-                origin_name = fi_d.replace(latest_version_substring, ".py")
-                os.remove(origin_name)  # Remove the original .py file
-                if os.path.getsize(fi_d) == 0:
+                if absolute_now.exists():
+                    os.rename(absolute_now, absolute_latest)
                     print(
-                        f"{Fore.LIGHTRED_EX}[Deleting Temp File]: "
-                        f"{Style.RESET_ALL}{fi_d[len(str(setting.project.target_repo)):]}, "
-                        f"{origin_name[len(str(setting.project.target_repo)):]}"
-                    )  # type: ignore
-                    os.remove(fi_d)
+                        f"{Fore.LIGHTMAGENTA_EX}[Save Latest Version of Code]: {Style.RESET_ALL}{now_file_path} -> {latest_file_path}"
+                    )
                 else:
                     print(
-                        f"{Fore.LIGHTRED_EX}[Recovering Latest Version]: "
-                        f"{Style.RESET_ALL}{origin_name[len(str(setting.project.target_repo)):]}"
-                        f" <- {fi_d[len(str(setting.project.target_repo)):]}"
-                    )  # type: ignore
-                    os.rename(fi_d, origin_name)
+                        f"{Fore.LIGHTMAGENTA_EX}[Create Temp-File for Deleted (Not Staged) Files]: {Style.RESET_ALL}{now_file_path} -> {latest_file_path}"
+                    )
+                    with open(absolute_latest, "w", encoding="utf-8") as writer:
+                        pass
 
-    delete_fake_files_recursively(setting.project.target_repo)
+                with open(absolute_now, "w", encoding="utf-8") as writer:
+                    writer.write(raw_file_content)
+
+                file_path_reflections[now_file_path] = latest_file_path
+
+        return file_path_reflections, skipped_files
+
+    # ------------------------------------------------------------------
+    def delete_temp_versions(self) -> None:
+        """Remove or restore temporary files created by `make_temp_versions`."""
+
+        def _delete_recursively(filepath: Path) -> None:
+            for entry in os.listdir(filepath):
+                fi_d = filepath / entry
+                if fi_d.is_dir():
+                    _delete_recursively(fi_d)
+                elif str(fi_d).endswith(latest_version_substring):
+                    origin_name = Path(str(fi_d).replace(latest_version_substring, ".py"))
+                    if origin_name.exists():
+                        os.remove(origin_name)
+                    if fi_d.stat().st_size == 0:
+                        print(
+                            f"{Fore.LIGHTRED_EX}[Deleting Temp File]: {Style.RESET_ALL}{fi_d.relative_to(self.repo_path)}, {origin_name.relative_to(self.repo_path)}"
+                        )
+                        os.remove(fi_d)
+                    else:
+                        print(
+                            f"{Fore.LIGHTRED_EX}[Recovering Latest Version]: {Style.RESET_ALL}{origin_name.relative_to(self.repo_path)} <- {fi_d.relative_to(self.repo_path)}"
+                        )
+                        os.rename(fi_d, origin_name)
+
+        _delete_recursively(self.repo_path)
+
+
+def make_fake_files() -> tuple[dict[str, str], list[str]]:
+    """Convenience wrapper around :class:`FakeFileManager`."""
+    return FakeFileManager().make_temp_versions()
+
+
+def delete_fake_files() -> None:
+    """Convenience wrapper around :class:`FakeFileManager`."""
+    FakeFileManager().delete_temp_versions()
