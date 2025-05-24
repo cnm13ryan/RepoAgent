@@ -1,5 +1,5 @@
-import os
 import itertools
+import os
 
 import git
 from colorama import Fore, Style
