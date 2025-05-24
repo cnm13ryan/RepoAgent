@@ -1,6 +1,15 @@
+"""
+Orchestrates change detection, task dispatch and Markdown
+updates for documentation generation.
+Workflow:
+ 1. Load meta-info tracking documentation state.
+ 2. Detect changes and build tasks for missing docs.
+ 3. Use workers to call ChatEngine for each task.
+ 4. Refresh Markdown files and checkpoint the new state.
+"""
+
 import json
 import os
-import shutil
 import subprocess
 import threading
 import time
@@ -9,7 +18,8 @@ from functools import partial
 from pathlib import Path
 
 from colorama import Fore, Style
-from tqdm import tqdm
+
+from repo_agent.doc_builder import MarkdownBuilder
 
 from repo_agent.change_detector import ChangeDetector
 from repo_agent.chat_engine import ChatEngine
@@ -54,6 +64,7 @@ class Runner:
         self.meta_info.checkpoint(target_dir_path=self.absolute_project_hierarchy_path)
 
         self.runner_lock = threading.Lock()
+        self.markdown_builder = MarkdownBuilder(self.setting, self.runner_lock)
 
 
     def run(self):
@@ -126,7 +137,7 @@ class Runner:
         )
         logger.info("Doc has been forwarded to the latest version.")
 
-        self.markdown_refresh()
+        self.markdown_builder.refresh(self.meta_info)
         delete_fake_files()
 
         logger.info("Starting to git-add DocMetaInfo and newly generated Docs")
@@ -177,7 +188,7 @@ class Runner:
                 thread.join()
 
             # Refresh markdown
-            self.markdown_refresh()
+            self.markdown_builder.refresh(self.meta_info)
 
             # Set doc version and checkpoint
             self.meta_info.document_version = self.change_detector.repo.head.commit.hexsha
@@ -232,106 +243,6 @@ class Runner:
             doc_item.item_status = DocItemStatus.doc_has_not_been_generated
 
 
-    def markdown_refresh(self):
-        """
-        Rebuild the entire Markdown folder from in-memory doc items.
-        Deletes the old folder, recreates it, and writes out .md files for each file's children.
-        """
-        with self.runner_lock:
-            markdown_folder = (
-                Path(self.setting.project.target_repo)
-                / self.setting.project.markdown_docs_name
-            )
-
-            # Delete old docs if present
-            if markdown_folder.exists():
-                logger.debug(f"Deleting existing contents of {markdown_folder}")
-                shutil.rmtree(markdown_folder)
-
-            # Recreate folder
-            markdown_folder.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Created markdown folder at {markdown_folder}")
-
-        file_item_list = self.meta_info.get_all_files()
-        logger.debug(f"Found {len(file_item_list)} files to process.")
-
-        for file_item in tqdm(file_item_list):
-            # Helper to see if this item has any doc content
-            def recursive_check(doc_item) -> bool:
-                if doc_item.md_content:
-                    return True
-                for child in doc_item.children.values():
-                    if recursive_check(child):
-                        return True
-                return False
-
-            if not recursive_check(file_item):
-                logger.debug(
-                    f"No documentation content for: {file_item.get_full_name()}, skipping."
-                )
-                continue
-
-            # Build markdown by recursing children
-            markdown = ""
-            for child in file_item.children.values():
-                markdown += self.to_markdown(child, 2)
-
-            if not markdown:
-                logger.warning(
-                    f"No markdown content generated for: {file_item.get_full_name()}"
-                )
-                continue
-
-            # Determine output path
-            file_path = Path(self.setting.project.markdown_docs_name) / file_item.get_file_name().replace(".py", ".md")
-            abs_file_path = self.setting.project.target_repo / file_path
-            logger.debug(f"Writing markdown to: {abs_file_path}")
-
-            abs_file_path.parent.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Ensured directory exists: {abs_file_path.parent}")
-
-            # Attempt file writing, with lock and retries
-            with self.runner_lock:
-                for attempt in range(3):
-                    try:
-                        with open(abs_file_path, "w", encoding="utf-8") as file:
-                            file.write(markdown)
-                        logger.debug(f"Successfully wrote to {abs_file_path}")
-                        break
-                    except IOError as e:
-                        logger.error(
-                            f"Failed to write {abs_file_path} on attempt {attempt + 1}: {e}"
-                        )
-                        time.sleep(1)
-
-        logger.info(
-            f"Markdown documents have been refreshed at {self.setting.project.markdown_docs_name}"
-        )
-
-
-    def to_markdown(self, item, now_level: int) -> str:
-        """
-        Recursively convert a doc item into Markdown content,
-        including heading levels, parameters, and child items.
-        """
-        markdown_content = "#" * now_level + f" {item.item_type.to_str()} {item.obj_name}"
-
-        if "params" in item.content.keys() and item.content["params"]:
-            markdown_content += f"({', '.join(item.content['params'])})"
-        markdown_content += "\n"
-
-        # Use the latest doc content, or placeholder text if none exists
-        if item.md_content:
-            markdown_content += f"{item.md_content[-1]}\n"
-        else:
-            markdown_content += "Doc is waiting to be generated...\n"
-
-        # Recurse into children
-        for child in item.children.values():
-            markdown_content += self.to_markdown(child, now_level + 1)
-            markdown_content += "***\n"
-
-        return markdown_content
 
 
     def add_new_item(self, file_handler, json_data):
