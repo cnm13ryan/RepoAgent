@@ -1,3 +1,10 @@
-# repo_agent/chat_with_repo/__init__.py
+"""Entry points for the ``chat_with_repo`` package."""
 
-from .main import main
+
+def main() -> None:
+    """Run the interactive chat interface."""
+    from .main import main as _main
+
+    return _main()
+
+__all__ = ["main"]

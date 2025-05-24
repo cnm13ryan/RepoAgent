@@ -1,3 +1,5 @@
+"""Utilities for loading and searching project JSON data."""
+
 import json
 import sys
 
