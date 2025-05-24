@@ -1,6 +1,6 @@
 import time
 
-from repo_agent.chat_with_repo.gradio_interface import GradioInterface
+from repo_agent.chat_with_repo.ui.gradio_interface import GradioInterface
 from repo_agent.chat_with_repo.rag import RepoAssistant
 from repo_agent.log import logger
 from repo_agent.settings import SettingsManager

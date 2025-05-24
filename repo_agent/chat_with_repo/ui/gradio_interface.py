@@ -1,3 +1,5 @@
+"""Gradio-based user interface for interacting with the assistant."""
+
 import gradio as gr
 import markdown
 
